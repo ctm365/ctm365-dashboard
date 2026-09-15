@@ -1,5 +1,6 @@
 import "server-only";
-import { DEMO_SITE, STREAM_INTERVAL_MS } from "./fleet";
+import { getCustomerConfig } from "./config/store";
+import { STREAM_INTERVAL_MS } from "./fleet";
 import { Simulator } from "./simulator";
 import type { Reading, SiteDef } from "./types";
 
@@ -9,8 +10,9 @@ import type { Reading, SiteDef } from "./types";
  * token's custom:customer_id claim), never from the browser: not query
  * strings, bodies, headers, or client state.
  *
- * Today these wrap the simulator. Later they will query DynamoDB
- * (ctm365_customer_config, and ctm365_telemetry filtered by customer_id).
+ * Site layout and labels come from DynamoDB ctm365_customer_config (edited
+ * on /admin). Readings are still simulated; later they will query
+ * ctm365_telemetry filtered by customer_id.
  */
 
 function assertCustomerId(customerId: string) {
@@ -21,7 +23,20 @@ function assertCustomerId(customerId: string) {
 
 export async function getCustomerSite(customerId: string): Promise<SiteDef> {
   assertCustomerId(customerId);
-  return DEMO_SITE;
+  const config = await getCustomerConfig(customerId);
+  if (!config) {
+    // Not set up on /admin yet. The dashboard shows "no sensors configured yet".
+    return { id: customerId, name: "Unnamed site", assets: [], sensors: [] };
+  }
+
+  const assetIds = new Set(config.assets.map((a) => a.id));
+  return {
+    id: customerId,
+    name: config.siteName || "Unnamed site",
+    assets: config.assets,
+    // A sensor pointing at a missing asset would show in the strip but not the table.
+    sensors: config.sensors.filter((s) => assetIds.has(s.assetId)),
+  };
 }
 
 export interface ReadingStream {

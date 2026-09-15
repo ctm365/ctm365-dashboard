@@ -16,20 +16,34 @@ export interface Session {
    * null means the account has no customer assigned: show no data.
    */
   customerId: string | null;
+  /**
+   * Cognito groups from the ID token's cognito:groups claim. Fixed when the
+   * token was issued, so a group change applies at the next sign-in or
+   * refresh (at most one ID token lifetime).
+   */
+  groups: string[];
   /** ID token expiry, epoch ms. */
   expiresAt: number;
 }
+
+const ADMIN_GROUP = "Admins";
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>;
 
 function toSession(claims: CognitoIdTokenPayload): Session {
   const customerId = claims["custom:customer_id"];
+  const groups = claims["cognito:groups"];
   return {
     email: typeof claims.email === "string" ? claims.email : "",
     sub: claims.sub,
     customerId: typeof customerId === "string" && customerId.trim() !== "" ? customerId : null,
+    groups: Array.isArray(groups) ? groups.filter((g): g is string => typeof g === "string") : [],
     expiresAt: claims.exp * 1000,
   };
+}
+
+export function isAdmin(session: Session): boolean {
+  return session.groups.includes(ADMIN_GROUP);
 }
 
 async function sessionFromIdToken(store: CookieStore): Promise<Session | null> {
@@ -103,4 +117,27 @@ export async function requireSession(returnTo: string): Promise<Session> {
     redirect(`/api/auth/refresh?next=${encodeURIComponent(returnTo)}`);
   }
   redirect("/login");
+}
+
+/**
+ * For admin Server Component pages. Signed out → /login; signed in but not
+ * in Admins → /. Call it in every admin page; layouts don't re-run on
+ * client navigation, and one page's check never protects another.
+ */
+export async function requireAdmin(returnTo: string): Promise<Session> {
+  const session = await requireSession(returnTo);
+  if (!isAdmin(session)) redirect("/");
+  return session;
+}
+
+/**
+ * For admin Server Actions. Same rules as requireAdmin(), but uses
+ * getSession() so an expired ID token is refreshed in place instead of
+ * navigating away mid-edit. Call it first in every admin action.
+ */
+export async function requireAdminAction(): Promise<Session> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (!isAdmin(session)) redirect("/");
+  return session;
 }

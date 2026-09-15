@@ -7,6 +7,8 @@ import { useLiveFleet } from "@/lib/live-fleet";
 import { StatusBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
+
+const EDGE = { normal: "border-t-ok", watch: "border-t-watch", critical: "border-t-critical" } as const;
 import { formatF, formatTime } from "./format";
 
 export function SensorDetail() {
@@ -39,7 +41,7 @@ export function SensorDetail() {
   const yMax = Math.ceil(Math.max(THRESHOLDS.criticalF + 8, stats?.max ?? 0) / 5) * 5;
 
   return (
-    <Card className="flex min-w-0 flex-col lg:sticky lg:top-6 lg:self-start">
+    <Card className={cn("flex min-w-0 flex-col border-t-4 lg:sticky lg:top-6 lg:self-start", EDGE[selected.status])}>
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line px-5 py-4">
         <div>
           <h2 className="font-display text-xl font-semibold text-ink">{selected.name}</h2>

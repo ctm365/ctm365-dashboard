@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #eaeff4;
+  --color-surface: #ffffff;
+  --color-sunken: #f4f7fa;
+  --color-line: #d3dbe4;
+  --color-ink: #17222e;
+  --color-muted: #5a6776;
+  --color-brand: #1d5ba8;
+  --color-brand-soft: #e3ecf7;
+
+  --color-ok: #3c8a5c;
+  --color-ok-soft: #e4f1e9;
+  --color-watch: #b27316;
+  --color-watch-soft: #fbf0dc;
+  --color-critical: #a63e2c;
+  --color-critical-soft: #f8e3df;
+}
+
+html {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* A critical lamp pulses in place, like a panel alarm indicator. */
+@keyframes lamp-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px var(--color-critical);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 16px 4px var(--color-critical);
+    opacity: 0.82;
+  }
+}
+
+.lamp-critical {
+  animation: lamp-pulse 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp-critical {
+    animation: none;
+  }
+}

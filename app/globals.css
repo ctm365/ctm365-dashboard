@@ -37,25 +37,25 @@ html {
   outline-offset: 2px;
 }
 
-/* Critical annunciator windows flash, like a panel alarm. */
-@keyframes annunciate {
+/* A critical lamp pulses in place, like a panel alarm indicator. */
+@keyframes lamp-pulse {
   0%,
   100% {
-    background-color: var(--color-critical);
-    color: #fff;
+    box-shadow: 0 0 4px var(--color-critical);
+    opacity: 1;
   }
   50% {
-    background-color: var(--color-critical-soft);
-    color: var(--color-critical);
+    box-shadow: 0 0 16px 4px var(--color-critical);
+    opacity: 0.82;
   }
 }
 
-.annunciate {
-  animation: annunciate 1.4s ease-in-out infinite;
+.lamp-critical {
+  animation: lamp-pulse 1.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .annunciate {
+  .lamp-critical {
     animation: none;
   }
 }

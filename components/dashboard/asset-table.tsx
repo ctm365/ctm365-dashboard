@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatF } from "./format";
+import { Sparkline } from "./sparkline";
 
 export function AssetTable() {
   const { site, sensors, selected, select } = useLiveFleet();
@@ -21,13 +22,14 @@ export function AssetTable() {
           <tr>
             <TH>Sensor</TH>
             <TH className="text-right">Rise</TH>
+            <TH>Trend</TH>
             <TH>Status</TH>
           </tr>
         </THead>
         {site.assets.map((asset) => (
           <TBody key={asset.id}>
             <TR>
-              <th scope="rowgroup" colSpan={3} className="bg-sunken px-5 py-2 text-left text-sm font-semibold text-ink">
+              <th scope="rowgroup" colSpan={4} className="bg-sunken px-5 py-2 text-left text-sm font-semibold text-ink">
                 {asset.name}
               </th>
             </TR>
@@ -56,6 +58,9 @@ export function AssetTable() {
                       <span className="ml-2 text-xs text-muted">Channel {s.channel}</span>
                     </TD>
                     <TD className="tabular text-right font-display font-medium">{formatF(s.latest?.deltaC)}°F</TD>
+                    <TD>
+                      <Sparkline history={s.history} status={s.status} />
+                    </TD>
                     <TD>
                       <StatusBadge status={s.status} />
                     </TD>

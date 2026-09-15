@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ConnectionState } from "@/lib/live-fleet";
 import { useLiveFleet } from "@/lib/live-fleet";
 import { SignOutButton } from "@/components/auth/sign-out-button";
@@ -16,10 +17,12 @@ export function SiteHeader({
   connection,
   lastUpdate,
   userEmail,
+  showAdminLink,
 }: {
   connection: ConnectionState;
   lastUpdate: number | null;
   userEmail: string;
+  showAdminLink: boolean;
 }) {
   const { site } = useLiveFleet();
 
@@ -27,7 +30,7 @@ export function SiteHeader({
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-baseline gap-4">
-          <span className="font-display text-lg font-semibold tracking-tight text-brand">CTM365</span>
+             <img src="/ctm365-logo.png" alt="CTM365" className="h-18 w-auto" />
           <span className="truncate text-sm text-muted">{site.name}</span>
         </div>
         <div className="flex min-w-0 items-center gap-3">
@@ -45,6 +48,11 @@ export function SiteHeader({
             )}
           </div>
           <div className="flex min-w-0 items-center gap-3 border-l border-line pl-3">
+            {showAdminLink && (
+              <Link href="/admin" className="rounded px-1 text-sm font-medium text-brand hover:underline">
+                Admin
+              </Link>
+            )}
             {userEmail && (
               <span className="hidden max-w-[16rem] truncate text-sm text-muted md:inline" title={userEmail}>
                 {userEmail}

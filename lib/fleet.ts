@@ -1,8 +1,8 @@
 import type { SiteDef, Status, Thresholds } from "./types";
 
 /**
- * Placeholder site layout. Later this comes from the ctm365_customer_config
- * DynamoDB table, keyed by the signed-in user's customer_id.
+ * Default sensor list for the simulator only. Customer site layouts now come
+ * from the ctm365_customer_config DynamoDB table (see lib/telemetry.ts).
  */
 export const DEMO_SITE: SiteDef = {
   id: "site-01",

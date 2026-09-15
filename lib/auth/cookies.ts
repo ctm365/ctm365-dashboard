@@ -9,10 +9,19 @@ type CookieJar = Pick<NextResponse["cookies"], "set">;
 const REFRESH_MAX_AGE_S = 5 * 24 * 60 * 60;
 const CHALLENGE_MAX_AGE_S = 3 * 60;
 
+/**
+ * Browsers drop Secure cookies on plain-HTTP origins, so a deployment without
+ * TLS sets COOKIE_SECURE=false. Anything else keeps the production default.
+ */
+function secureCookies() {
+  if (process.env.COOKIE_SECURE?.trim().toLowerCase() === "false") return false;
+  return process.env.NODE_ENV === "production";
+}
+
 function baseOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureCookies(),
     sameSite: "lax" as const,
     path: "/",
   };
