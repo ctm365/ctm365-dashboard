@@ -90,9 +90,20 @@ export function LiveFleetProvider({ site, children }: { site: SiteDef; children:
     source.addEventListener("readings", (e) =>
       dispatch({ type: "readings", readings: JSON.parse((e as MessageEvent).data) }),
     );
-    // EventSource retries on its own; we only reflect the state.
-    source.onerror = () => dispatch({ type: "connection", value: "reconnecting" });
-    return () => source.close();
+    // EventSource retries network drops on its own; we only reflect the state.
+    // If the server refuses the stream (e.g. 401 once the session ends), it
+    // stops retrying, so reload and let the page re-check sign-in.
+    let reloadTimer: number | undefined;
+    source.onerror = () => {
+      dispatch({ type: "connection", value: "reconnecting" });
+      if (source.readyState === EventSource.CLOSED && reloadTimer === undefined) {
+        reloadTimer = window.setTimeout(() => window.location.reload(), 5000);
+      }
+    };
+    return () => {
+      window.clearTimeout(reloadTimer);
+      source.close();
+    };
   }, []);
 
   const value = useMemo<LiveFleet>(() => {

@@ -1,20 +1,21 @@
+import { AccountNotConfigured } from "@/components/auth/account-not-configured";
 import { Dashboard } from "@/components/dashboard/dashboard";
+import { requireSession } from "@/lib/auth/session";
 import { LiveFleetProvider } from "@/lib/live-fleet";
 import { getCustomerSite } from "@/lib/telemetry";
-
-/**
- * Temporary until Cognito auth is added. After that, customerId comes from
- * the verified session, and signed-out visitors are redirected to /login.
- */
-const DEMO_CUSTOMER_ID = "demo";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const site = await getCustomerSite(DEMO_CUSTOMER_ID);
+  const session = await requireSession("/");
+  if (!session.customerId) {
+    return <AccountNotConfigured email={session.email} />;
+  }
+
+  const site = await getCustomerSite(session.customerId);
   return (
     <LiveFleetProvider site={site}>
-      <Dashboard />
+      <Dashboard userEmail={session.email} />
     </LiveFleetProvider>
   );
 }

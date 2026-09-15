@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --conditions=react-server --test \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1132.0",

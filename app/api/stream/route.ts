@@ -1,17 +1,20 @@
-import { openCustomerReadingStream } from "@/lib/telemetry";
+import { getSession } from "@/lib/auth/session";
+import { streamCustomerReadings } from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Temporary until Cognito auth is added. After that, this value must come
- * from the verified session (getSession().customerId), and the route must
- * return 401 when there is no session.
- */
-const DEMO_CUSTOMER_ID = "demo";
-
 export async function GET(request: Request) {
-  const readings = await openCustomerReadingStream(DEMO_CUSTOMER_ID);
+  // Middleware is only a convenience redirect; this route verifies the session itself.
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  }
+  if (!session.customerId) {
+    return Response.json({ error: "Account not configured" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
+
+  const readings = await streamCustomerReadings(session.customerId);
   const encoder = new TextEncoder();
   let cleanup = () => {};
 
@@ -27,9 +30,14 @@ export async function GET(request: Request) {
       // Comment line every 15 s keeps proxies from closing an idle connection.
       const keepAlive = setInterval(() => controller.enqueue(encoder.encode(": keep-alive\n\n")), 15000);
 
+      // End the stream when the ID token expires. EventSource reconnects, and
+      // that request re-checks (and refreshes) the session.
+      const sessionExpiry = setTimeout(() => cleanup(), Math.max(0, session.expiresAt - Date.now()));
+
       cleanup = () => {
         unsubscribe();
         clearInterval(keepAlive);
+        clearTimeout(sessionExpiry);
         try {
           controller.close();
         } catch {
