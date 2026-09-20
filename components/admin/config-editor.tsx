@@ -9,6 +9,7 @@ import {
   renameAsset,
   renameSensor,
   setSensorChannel,
+  updateDisplaySettings,
   updateSiteName,
   type ConfigResult,
 } from "@/app/admin/actions";
@@ -17,6 +18,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { CustomerConfig, SensorConfig } from "@/lib/config/types";
 import { CHANNEL_MAX, CHANNEL_MIN, NAME_MAX_LENGTH } from "@/lib/config/validation";
 import { ChannelInput } from "./channel-input";
+import { DisplaySettings } from "./display-settings";
 import { EditableText } from "./editable-text";
 
 function nextFreeChannel(sensors: SensorConfig[]) {
@@ -105,6 +107,12 @@ export function ConfigEditor({ initialConfig }: { initialConfig: CustomerConfig 
           </p>
         </CardContent>
       </Card>
+
+      <DisplaySettings
+        unit={config.tempUnit}
+        thresholds={config.thresholds}
+        onSave={(unit, watchC, criticalC) => save(() => updateDisplaySettings(customerId, unit, watchC, criticalC))}
+      />
 
       <div aria-live="assertive">
         {actionError && (

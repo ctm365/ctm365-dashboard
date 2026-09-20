@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { formatF } from "./format";
+import { formatRise } from "./format";
 import { Sparkline } from "./sparkline";
 
 export function AssetTable() {
@@ -57,7 +57,7 @@ export function AssetTable() {
                       </button>
                       <span className="ml-2 text-xs text-muted">Channel {s.channel}</span>
                     </TD>
-                    <TD className="tabular text-right font-display font-medium">{formatF(s.latest?.deltaC)}°F</TD>
+                    <TD className="tabular text-right font-display font-medium">{formatRise(s.latest?.deltaC, site.unit)}°{site.unit}</TD>
                     <TD>
                       <Sparkline history={s.history} status={s.status} />
                     </TD>

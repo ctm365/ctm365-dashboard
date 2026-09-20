@@ -13,6 +13,8 @@ import {
   parseChannel,
   parseCustomerId,
   parseName,
+  parseTempUnit,
+  parseThresholds,
 } from "@/lib/config/validation";
 
 /**
@@ -105,6 +107,26 @@ export async function updateSiteName(customerId: string, name: string): Promise<
     return applyChange("updateSiteName", customerId, (c) => ({ ...c, siteName }));
   } catch (err) {
     return failure("updateSiteName", err);
+  }
+}
+
+/**
+ * Temperature unit plus the watch/critical limits (Celsius rise) that color
+ * every sensor on this customer's dashboard. Saved together so they can't end up half-applied.
+ */
+export async function updateDisplaySettings(
+  customerId: string,
+  unit: string,
+  watchC: number,
+  criticalC: number,
+): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    const tempUnit = parseTempUnit(unit);
+    const thresholds = parseThresholds(watchC, criticalC);
+    return applyChange("updateDisplaySettings", customerId, (c) => ({ ...c, tempUnit, thresholds }));
+  } catch (err) {
+    return failure("updateDisplaySettings", err);
   }
 }
 

@@ -1,3 +1,5 @@
+import type { TempUnit, Thresholds } from "../types";
+
 export interface AssetConfig {
   id: string;
   name: string;
@@ -16,5 +18,9 @@ export interface CustomerConfig {
   siteName: string;
   assets: AssetConfig[];
   sensors: SensorConfig[];
+  /** Unit the customer's dashboard shows temperature rise in. Defaults to °F. */
+  tempUnit: TempUnit;
+  /** Watch/critical boundaries (Celsius rise) applied to every sensor. */
+  thresholds: Thresholds;
   updatedAt: string;
 }

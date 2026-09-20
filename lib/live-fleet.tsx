@@ -110,7 +110,7 @@ export function LiveFleetProvider({ site, children }: { site: SiteDef; children:
     const sensors: SensorView[] = site.sensors.map((def) => {
       const history = state.history[def.id] ?? [];
       const latest = history.at(-1) ?? null;
-      return { ...def, history, latest, status: latest ? statusFor(latest.deltaC) : "normal" };
+      return { ...def, history, latest, status: latest ? statusFor(latest.deltaC, site.thresholds) : "normal" };
     });
 
     // Default selection: the worst sensor, so attention lands where it's needed.

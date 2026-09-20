@@ -35,7 +35,7 @@ Then open http://localhost:3000. Other scripts: `npm run typecheck`, `npm run li
 
 ## Units and thresholds
 
-Readings are stored in Celsius (`deltaC`, matching `temperature_rise_c` in DynamoDB) and shown in Fahrenheit. Watch and critical thresholds live in `lib/fleet.ts` and are placeholders.
+Readings are stored in Celsius (`deltaC`, matching `temperature_rise_c` in DynamoDB). Each customer chooses the unit their dashboard shows (°F by default) and their own watch and critical limits on `/admin/<customerId>`. Both are saved on the customer's `ctm365_customer_config` item as `tempUnit` and `thresholds` (`watchC`, `criticalC`, temperature rise in Celsius). One pair applies to every sensor for that customer: below watch is normal (green), watch up to critical is yellow, critical and above is red. Items without these fields use the defaults in `lib/fleet.ts` (watch 10°C = 18°F, critical 25°C = 45°F), so existing customers are unchanged until an admin edits them.
 
 ## Authentication and tenant scoping
 

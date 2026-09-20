@@ -1,7 +1,9 @@
 import "server-only";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DEFAULT_TEMP_UNIT, DEFAULT_THRESHOLDS } from "../fleet";
 import type { AssetConfig, CustomerConfig, SensorConfig } from "./types";
+import { isTempUnit, normalizeThresholds } from "./validation";
 
 /**
  * Per-customer dashboard labels in DynamoDB. One item per customer:
@@ -55,6 +57,9 @@ function fromItem(item: Record<string, unknown>): CustomerConfig {
     siteName: typeof item.siteName === "string" ? item.siteName : "",
     assets,
     sensors,
+    // Items saved before these settings existed have neither field.
+    tempUnit: isTempUnit(item.tempUnit) ? item.tempUnit : DEFAULT_TEMP_UNIT,
+    thresholds: normalizeThresholds(item.thresholds, DEFAULT_THRESHOLDS),
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
   };
 }
@@ -65,6 +70,8 @@ function toItem(config: CustomerConfig) {
     siteName: config.siteName,
     assets: config.assets,
     sensors: config.sensors,
+    tempUnit: config.tempUnit,
+    thresholds: config.thresholds,
     updatedAt: config.updatedAt,
   };
 }
@@ -106,7 +113,15 @@ export async function createCustomerConfig(customerId: string): Promise<boolean>
     await getClient().send(
       new PutCommand({
         TableName: TABLE_NAME,
-        Item: toItem({ customerId, siteName: "Unnamed site", assets: [], sensors: [], updatedAt: new Date().toISOString() }),
+        Item: toItem({
+          customerId,
+          siteName: "Unnamed site",
+          assets: [],
+          sensors: [],
+          tempUnit: DEFAULT_TEMP_UNIT,
+          thresholds: DEFAULT_THRESHOLDS,
+          updatedAt: new Date().toISOString(),
+        }),
         ConditionExpression: "attribute_not_exists(customer_id)",
       }),
     );

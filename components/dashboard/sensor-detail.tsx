@@ -2,26 +2,27 @@
 
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { THRESHOLDS, cToF } from "@/lib/fleet";
+import { convertRise } from "@/lib/fleet";
 import { useLiveFleet } from "@/lib/live-fleet";
 import { StatusBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 
 const EDGE = { normal: "border-t-ok", watch: "border-t-watch", critical: "border-t-critical" } as const;
-import { formatF, formatTime } from "./format";
+import { formatLimit, formatRise, formatTime } from "./format";
 
 export function SensorDetail() {
   const { selected, site } = useLiveFleet();
+  const { unit, thresholds } = site;
 
   const data = useMemo(
-    () => (selected?.history ?? []).map((r) => ({ ts: r.ts, f: Math.round(cToF(r.deltaC) * 10) / 10 })),
-    [selected?.history],
+    () => (selected?.history ?? []).map((r) => ({ ts: r.ts, rise: Math.round(convertRise(r.deltaC, unit) * 10) / 10 })),
+    [selected?.history, unit],
   );
 
   const stats = useMemo(() => {
     if (data.length === 0) return null;
-    const values = data.map((d) => d.f);
+    const values = data.map((d) => d.rise);
     return {
       min: Math.min(...values),
       max: Math.max(...values),
@@ -38,7 +39,11 @@ export function SensorDetail() {
   }
 
   const asset = site.assets.find((a) => a.id === selected.assetId);
-  const yMax = Math.ceil(Math.max(THRESHOLDS.criticalF + 8, stats?.max ?? 0) / 5) * 5;
+  const watchLimit = convertRise(thresholds.watchC, unit);
+  const criticalLimit = convertRise(thresholds.criticalC, unit);
+  // Headroom above the critical line is 8°F (about 4.4°C) so the line never hugs the top edge.
+  const headroom = unit === "F" ? 8 : 4.5;
+  const yMax = Math.ceil(Math.max(criticalLimit + headroom, stats?.max ?? 0) / 5) * 5;
 
   return (
     <Card className={cn("flex min-w-0 flex-col border-t-4 lg:sticky lg:top-6 lg:self-start", EDGE[selected.status])}>
@@ -56,8 +61,8 @@ export function SensorDetail() {
               selected.status === "critical" ? "text-critical" : selected.status === "watch" ? "text-watch" : "text-ink",
             )}
           >
-            {formatF(selected.latest?.deltaC)}
-            <span className="ml-1 text-xl font-medium text-muted">°F</span>
+            {formatRise(selected.latest?.deltaC, unit)}
+            <span className="ml-1 text-xl font-medium text-muted">°{unit}</span>
           </p>
           <div className="mt-2 flex items-center justify-end gap-2">
             <StatusBadge status={selected.status} />
@@ -88,25 +93,25 @@ export function SensorDetail() {
               tickFormatter={(v: number) => `${v}°`}
             />
             <ReferenceLine
-              y={THRESHOLDS.watchF}
+              y={watchLimit}
               stroke="var(--color-watch)"
               strokeDasharray="6 4"
               label={{ value: "Watch", position: "right", fill: "var(--color-watch)", fontSize: 12 }}
             />
             <ReferenceLine
-              y={THRESHOLDS.criticalF}
+              y={criticalLimit}
               stroke="var(--color-critical)"
               strokeDasharray="6 4"
               label={{ value: "Critical", position: "right", fill: "var(--color-critical)", fontSize: 12 }}
             />
             <Tooltip
               labelFormatter={(ts) => formatTime(Number(ts))}
-              formatter={(v) => [`${Number(v).toFixed(1)}°F`, "Rise"]}
+              formatter={(v) => [`${Number(v).toFixed(1)}°${unit}`, "Rise"]}
               contentStyle={{ borderRadius: 6, borderColor: "var(--color-line)", fontSize: 13 }}
             />
             <Line
               type="monotone"
-              dataKey="f"
+              dataKey="rise"
               stroke="var(--color-brand)"
               strokeWidth={2}
               dot={false}
@@ -125,14 +130,14 @@ export function SensorDetail() {
           ].map(([label, value]) => (
             <div key={label as string} className="px-5 py-3">
               <dt className="text-xs text-muted">{label}</dt>
-              <dd className="tabular font-display text-lg font-medium">{(value as number).toFixed(1)}°F</dd>
+              <dd className="tabular font-display text-lg font-medium">{(value as number).toFixed(1)}°{unit}</dd>
             </div>
           ))}
         </dl>
       )}
       <p className="px-5 pb-4 text-xs text-muted">
-        Last {Math.round((data.length * 2) / 60)} minutes. Watch at {THRESHOLDS.watchF}°F rise, critical at{" "}
-        {THRESHOLDS.criticalF}°F.
+        Last {Math.round((data.length * 2) / 60)} minutes. Watch at {formatLimit(thresholds.watchC, unit)}°{unit} rise,
+        critical at {formatLimit(thresholds.criticalC, unit)}°{unit}.
       </p>
     </Card>
   );

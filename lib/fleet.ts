@@ -1,4 +1,17 @@
-import type { SiteDef, Status, Thresholds } from "./types";
+import type { SiteDef, Status, TempUnit, Thresholds } from "./types";
+
+/**
+ * Default thresholds for any customer that hasn't set their own on /admin:
+ * a 10°C rise is on watch, 25°C is critical. These are exactly the old
+ * hardcoded 18°F and 45°F placeholders, so existing customers see no change.
+ * Confirm against your own condition-monitoring criteria.
+ */
+export const DEFAULT_THRESHOLDS: Thresholds = {
+  watchC: 10,
+  criticalC: 25,
+};
+
+export const DEFAULT_TEMP_UNIT: TempUnit = "F";
 
 /**
  * Default sensor list for the simulator only. Customer site layouts now come
@@ -17,20 +30,25 @@ export const DEMO_SITE: SiteDef = {
     { id: "sensor-3", name: "Sensor 3", assetId: "asset-2", channel: 3 },
     { id: "sensor-4", name: "Sensor 4", assetId: "asset-2", channel: 4 },
   ],
+  unit: DEFAULT_TEMP_UNIT,
+  thresholds: DEFAULT_THRESHOLDS,
 };
 
-/** Placeholder thresholds. Confirm against your own condition-monitoring criteria. */
-export const THRESHOLDS: Thresholds = {
-  watchF: 18,
-  criticalF: 45,
-};
-
+/**
+ * Both conversions are for temperature *rise* (a difference between two
+ * temperatures), so they scale by 1.8 with no +32 offset.
+ */
 export const cToF = (deltaC: number) => deltaC * 1.8;
 
-export function statusFor(deltaC: number, t: Thresholds = THRESHOLDS): Status {
-  const f = cToF(deltaC);
-  if (f >= t.criticalF) return "critical";
-  if (f >= t.watchF) return "watch";
+/** Converts a stored Celsius rise into the unit being displayed. */
+export const convertRise = (deltaC: number, unit: TempUnit) => (unit === "F" ? cToF(deltaC) : deltaC);
+
+/** Converts a rise typed in the displayed unit back to Celsius, rounded to keep stored values tidy. */
+export const riseToC = (value: number, unit: TempUnit) => Math.round((unit === "F" ? value / 1.8 : value) * 1000) / 1000;
+
+export function statusFor(deltaC: number, t: Thresholds = DEFAULT_THRESHOLDS): Status {
+  if (deltaC >= t.criticalC) return "critical";
+  if (deltaC >= t.watchC) return "watch";
   return "normal";
 }
 

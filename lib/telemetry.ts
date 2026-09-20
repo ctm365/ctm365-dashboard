@@ -1,6 +1,6 @@
 import "server-only";
 import { getCustomerConfig } from "./config/store";
-import { STREAM_INTERVAL_MS } from "./fleet";
+import { DEFAULT_TEMP_UNIT, DEFAULT_THRESHOLDS, STREAM_INTERVAL_MS } from "./fleet";
 import { Simulator } from "./simulator";
 import type { Reading, SiteDef } from "./types";
 
@@ -26,7 +26,14 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
   const config = await getCustomerConfig(customerId);
   if (!config) {
     // Not set up on /admin yet. The dashboard shows "no sensors configured yet".
-    return { id: customerId, name: "Unnamed site", assets: [], sensors: [] };
+    return {
+      id: customerId,
+      name: "Unnamed site",
+      assets: [],
+      sensors: [],
+      unit: DEFAULT_TEMP_UNIT,
+      thresholds: DEFAULT_THRESHOLDS,
+    };
   }
 
   const assetIds = new Set(config.assets.map((a) => a.id));
@@ -36,6 +43,8 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
     assets: config.assets,
     // A sensor pointing at a missing asset would show in the strip but not the table.
     sensors: config.sensors.filter((s) => assetIds.has(s.assetId)),
+    unit: config.tempUnit,
+    thresholds: config.thresholds,
   };
 }
 
