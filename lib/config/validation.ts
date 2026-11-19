@@ -74,6 +74,17 @@ export function parseDatacardId(value: unknown): string | null {
   return id;
 }
 
+export const POWER_METER_ID_RULE =
+  "Letters, numbers, dots, hyphens and underscores, up to 64 characters. Must match the end of the meter's MQTT topic, e.g. panel-01.";
+
+/** A blank value means no panel meter. Same character rules as a datacard ID. */
+export function parsePowerMeterId(value: unknown): string | null {
+  const id = typeof value === "string" ? value.trim() : "";
+  if (id === "") return null;
+  if (!HVAC_UNIT_ID_PATTERN.test(id)) throw new ConfigInputError(`Invalid power meter ID. ${POWER_METER_ID_RULE}`);
+  return id;
+}
+
 /** Lenient read for stored items: anything that isn't a valid ID means no datacard. */
 export function normalizeDatacardId(value: unknown): string | null {
   return typeof value === "string" && HVAC_UNIT_ID_PATTERN.test(value) ? value : null;

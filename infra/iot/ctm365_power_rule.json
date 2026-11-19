@@ -1,0 +1,7 @@
+{
+  "sql": "SELECT *, topic(2) AS site_id, topic(4) AS unit_id, timestamp() AS received_ms FROM 'ctm365/+/power/+'",
+  "description": "Electrical-panel WattNodes publish to ctm365/<site>/power/<meter-id>. Same ingest Lambda as HVAC meters; readings land in ctm365_hvac_telemetry keyed by the meter ID.",
+  "awsIotSqlVersion": "2016-03-23",
+  "ruleDisabled": false,
+  "actions": [{ "lambda": { "functionArn": "arn:aws:lambda:us-west-2:593989447113:function:ctm365-hvac-ingest" } }]
+}

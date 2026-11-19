@@ -57,7 +57,7 @@ function modeFor(deltaF: number | undefined, amps: number | undefined) {
   return "Fan / idle";
 }
 
-function timeLabel(ts: number, withDate: boolean) {
+export function timeLabel(ts: number, withDate: boolean) {
   return new Date(ts).toLocaleString([], withDate
     ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }
     : { hour: "numeric", minute: "2-digit" });
@@ -270,9 +270,9 @@ function HvacUnitCard({
   );
 }
 
-type ChartRow = { ts: number } & Record<string, number | undefined>;
+export type ChartRow = { ts: number } & Record<string, number | undefined>;
 
-function TrendChart({
+export function TrendChart({
   title,
   data,
   series,

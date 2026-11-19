@@ -11,6 +11,7 @@ import {
   setSensorChannel,
   updateDatacardId,
   updateDisplaySettings,
+  updatePowerSettings,
   updateSampleData,
   updateServices,
   updateSiteName,
@@ -26,6 +27,7 @@ import { DeleteCustomer } from "./delete-customer";
 import { DisplaySettings } from "./display-settings";
 import { EditableText } from "./editable-text";
 import { HvacUnitsEditor } from "./hvac-units-editor";
+import { PowerSetting } from "./power-setting";
 import { SampleDataSetting } from "./sample-data-setting";
 import { ServicesSettings } from "./services-settings";
 import { UsersCard } from "./users-card";
@@ -150,6 +152,14 @@ export function ConfigEditor({ initialConfig, currentUserSub }: { initialConfig:
           <DatacardSetting
             datacardId={config.electricalDatacardId}
             onSave={(next) => save(() => updateDatacardId(customerId, next))}
+          />
+
+          <PowerSetting
+            meterId={config.electricalPowerMeterId}
+            showVoltage={config.showVoltage}
+            showCurrent={config.showCurrent}
+            sampleData={config.electricalSampleData}
+            onSave={(next) => save(() => updatePowerSettings(customerId, next))}
           />
 
           <DisplaySettings

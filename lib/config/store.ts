@@ -72,6 +72,9 @@ function fromItem(item: Record<string, unknown>): CustomerConfig {
     }),
     electricalDatacardId: normalizeDatacardId(item.electricalDatacardId),
     electricalSampleData: item.electricalSampleData === true,
+    electricalPowerMeterId: normalizeDatacardId(item.electricalPowerMeterId),
+    showVoltage: item.showVoltage === true,
+    showCurrent: item.showCurrent === true,
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
   };
 }
@@ -88,6 +91,9 @@ function toItem(config: CustomerConfig) {
     services: config.services,
     electricalDatacardId: config.electricalDatacardId,
     electricalSampleData: config.electricalSampleData,
+    electricalPowerMeterId: config.electricalPowerMeterId,
+    showVoltage: config.showVoltage,
+    showCurrent: config.showCurrent,
     updatedAt: config.updatedAt,
   };
 }
@@ -141,6 +147,9 @@ export async function createCustomerConfig(customerId: string): Promise<boolean>
           services: { electrical: false, hvac: false },
           electricalDatacardId: null,
           electricalSampleData: false,
+          electricalPowerMeterId: null,
+          showVoltage: false,
+          showCurrent: false,
           updatedAt: new Date().toISOString(),
         }),
         ConditionExpression: "attribute_not_exists(customer_id)",

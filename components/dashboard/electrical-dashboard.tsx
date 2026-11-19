@@ -5,29 +5,34 @@ import { AnnunciatorStrip } from "./annunciator-strip";
 import { AssetTable } from "./asset-table";
 import { AttentionHero } from "./attention-hero";
 import { EmptyState } from "./empty-state";
+import { PowerSection } from "./power-section";
 import { SensorDetail } from "./sensor-detail";
 
 /** Body of the Electrical page. Must sit inside LiveFleetProvider. */
 export function ElectricalDashboard() {
   const { site } = useLiveFleet();
+  // Panel voltage/current, when switched on for this customer; independent of the temperature sensors.
+  const power = site.showVoltage || site.showCurrent ? <PowerSection /> : null;
 
   if (!site.electricalDatacardId && !site.electricalSampleData) {
     return (
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
         <EmptyState title="Your monitoring equipment isn't connected yet">
           Once your site&apos;s datacard is connected, live temperature readings will appear here. Contact your
           CTM365 administrator if you expected to see data.
         </EmptyState>
+        {power}
       </main>
     );
   }
 
   if (site.sensors.length === 0) {
     return (
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
         <EmptyState title="No sensors configured yet">
           Your site&apos;s electrical assets and sensors haven&apos;t been set up. Contact your CTM365 administrator.
         </EmptyState>
+        {power}
       </main>
     );
   }
@@ -43,6 +48,7 @@ export function ElectricalDashboard() {
           </div>
           <SensorDetail />
         </div>
+        {power}
       </main>
     </>
   );

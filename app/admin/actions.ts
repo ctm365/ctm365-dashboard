@@ -23,6 +23,7 @@ import {
   adminCustomerPath,
   parseCustomerId,
   parseDatacardId,
+  parsePowerMeterId,
   parseHvacUnitId,
   parseName,
   parseServices,
@@ -168,6 +169,29 @@ export async function updateSampleData(customerId: string, on: boolean): Promise
     return applyChange("updateSampleData", customerId, (c) => ({ ...c, electricalSampleData: on }));
   } catch (err) {
     return failure("updateSampleData", err);
+  }
+}
+
+/** The electrical panel's power meter, and whether the Electrical page shows its voltage and current. */
+export async function updatePowerSettings(
+  customerId: string,
+  settings: { meterId: string; showVoltage: boolean; showCurrent: boolean },
+): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    const meterId = parsePowerMeterId(settings?.meterId);
+    if (typeof settings?.showVoltage !== "boolean" || typeof settings?.showCurrent !== "boolean") {
+      throw new ConfigInputError("Choose on or off for voltage and current.");
+    }
+    const { showVoltage, showCurrent } = settings;
+    return applyChange("updatePowerSettings", customerId, (c) => ({
+      ...c,
+      electricalPowerMeterId: meterId,
+      showVoltage,
+      showCurrent,
+    }));
+  } catch (err) {
+    return failure("updatePowerSettings", err);
   }
 }
 

@@ -11,7 +11,8 @@
       "Action": "iot:Publish",
       "Resource": [
         "arn:aws:iot:us-west-2:593989447113:topic/ctm365/acme-corp/plant-01/gt200-0042/temperature",
-        "arn:aws:iot:us-west-2:593989447113:topic/ctm365/*/electrical/*"
+        "arn:aws:iot:us-west-2:593989447113:topic/ctm365/*/electrical/*",
+        "arn:aws:iot:us-west-2:593989447113:topic/ctm365/*/power/*"
       ]
     }
   ]

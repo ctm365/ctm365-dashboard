@@ -42,6 +42,27 @@ export interface SiteDef {
   electricalDatacardId: string | null;
   /** Show the fixed sample scenario on the Electrical page instead of live readings (for demos). */
   electricalSampleData: boolean;
+  /** WattNode on the electrical panel (topic ctm365/<site>/power/<meter-id>), or null. */
+  electricalPowerMeterId: string | null;
+  /** Show the panel's per-phase voltage / current on the Electrical page. */
+  showVoltage: boolean;
+  showCurrent: boolean;
+}
+
+/** One minute of electrical-panel power readings. Any field can be missing. */
+export interface PowerReading {
+  ts: number;
+  /** Line-to-neutral volts per phase, when the panel has a neutral. */
+  voltsAN?: number;
+  voltsBN?: number;
+  voltsCN?: number;
+  /** Line-to-line volts. */
+  voltsAB?: number;
+  voltsBC?: number;
+  voltsCA?: number;
+  ampsA?: number;
+  ampsB?: number;
+  ampsC?: number;
 }
 
 /**

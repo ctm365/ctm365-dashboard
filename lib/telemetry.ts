@@ -40,6 +40,9 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
       services: NO_SERVICES,
       electricalDatacardId: null,
       electricalSampleData: false,
+      electricalPowerMeterId: null,
+      showVoltage: false,
+      showCurrent: false,
     };
   }
 
@@ -56,6 +59,9 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
     services: config.services,
     electricalDatacardId: config.electricalDatacardId,
     electricalSampleData: config.electricalSampleData,
+    electricalPowerMeterId: config.electricalPowerMeterId,
+    showVoltage: config.showVoltage,
+    showCurrent: config.showCurrent,
   };
 }
 

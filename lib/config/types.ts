@@ -39,5 +39,10 @@ export interface CustomerConfig {
   electricalDatacardId: string | null;
   /** Electrical page shows the fixed sample scenario instead of live readings, for demos. Off by default. */
   electricalSampleData: boolean;
+  /** WattNode on the electrical panel; its gateway publishes to ctm365/<site>/power/<meter-id>. null if none. */
+  electricalPowerMeterId: string | null;
+  /** Whether the Electrical page shows the panel's voltage / current. Off by default. */
+  showVoltage: boolean;
+  showCurrent: boolean;
   updatedAt: string;
 }
