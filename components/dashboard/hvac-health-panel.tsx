@@ -93,6 +93,99 @@ function CycleTimeline({ cycles, dayStart }: { cycles: HvacCycle[]; dayStart: nu
   );
 }
 
+const MEASURES = [
+  { key: "slt", label: "Suction line", unit: "°F", digits: 0 },
+  { key: "dlt", label: "Discharge line", unit: "°F", digits: 0 },
+  { key: "kw", label: "Unit power", unit: "kW", digits: 2 },
+  { key: "dt", label: "Air ΔT", unit: "°F", digits: 0 },
+] as const;
+
+/** Daily low-charge pattern strength as a small line; a steady rise is what a slow leak looks like. */
+function ChargeTrend({ points }: { points: { day: string; value: number }[] }) {
+  if (points.length < 2) return null;
+  const w = 160;
+  const h = 36;
+  const values = points.map((p) => p.value);
+  const lo = Math.min(-1, ...values);
+  const hi = Math.max(3, ...values);
+  const x = (i: number) => (i / (points.length - 1)) * (w - 4) + 2;
+  const y = (v: number) => h - 2 - ((v - lo) / (hi - lo)) * (h - 4);
+  const path = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+  const last = points[points.length - 1];
+  return (
+    <div className="flex items-center gap-3">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Charge pattern over ${points.length} days, latest ${last.value.toFixed(1)}`}>
+        <line x1="0" x2={w} y1={y(0)} y2={y(0)} stroke="var(--color-line)" strokeDasharray="2 3" />
+        <path d={path} fill="none" stroke="var(--color-brand)" strokeWidth="1.75" />
+        <circle cx={x(points.length - 1)} cy={y(last.value)} r="2.5" fill="var(--color-brand)" />
+      </svg>
+      <p className="text-xs text-muted">
+        Low-charge pattern, last {points.length} days. Flat near zero is healthy; a steady climb is what a slow leak looks like.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Refrigerant side from the strap-on line probes, compared like Thalo's
+ * Sidekick: today's typical readings against what this unit normally reads at
+ * the same outdoor temperature.
+ */
+function RefrigerantBlock({ health }: { health: HvacHealth }) {
+  const r = health.refrigerant;
+  const { refrigerantSamples, refrigerantModel, refrigerantConfidence } = health.baseline;
+
+  if (!r) {
+    if (refrigerantSamples > 0 && !refrigerantModel) {
+      const pct = Math.min(99, Math.round((refrigerantSamples / 60) * 100));
+      return (
+        <p className="text-xs text-muted">
+          Refrigerant analysis: line probes are reporting. Comparisons start after about 3 hours of compressor running ({pct}% there).
+        </p>
+      );
+    }
+    if (!refrigerantModel) {
+      return (
+        <p className="text-xs text-muted">
+          Refrigerant analysis starts when suction line, discharge line and outdoor air probes are fitted.
+        </p>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-line px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-medium text-ink">Refrigerant side, today vs normal</p>
+        <p className="text-xs text-muted">
+          At {Math.round(r.outdoorF)}°F outdoors · {refrigerantConfidence ?? "low"} confidence
+        </p>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+        {MEASURES.map((m) => {
+          const v = r.actual[m.key];
+          const [lo, hi] = r.range[m.key];
+          const out = v < lo || v > hi;
+          return (
+            <div key={m.key}>
+              <dt className="text-xs text-muted">{m.label}</dt>
+              <dd className={cn("tabular text-lg font-semibold", out ? "text-watch" : "text-ink")}>
+                {v.toFixed(m.digits)}
+                <span className="ml-0.5 text-xs font-medium text-muted">{m.unit}</span>
+              </dd>
+              <dd className="tabular text-xs text-muted">
+                normal {lo.toFixed(m.digits)}–{hi.toFixed(m.digits)}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+      <ChargeTrend points={health.chargeHistory} />
+    </div>
+  );
+}
+
 /**
  * Health for one HVAC unit: overall status and score, a status per category,
  * what was found and what to do, and today's runs.
@@ -154,12 +247,12 @@ export function HvacHealthPanel({ health }: { health: HvacHealth | undefined | n
 
       <CycleTimeline cycles={health.cycles} dayStart={health.dayStart} />
 
+      <RefrigerantBlock health={health} />
+
       <p className="text-xs text-muted">
         {baseline.ready
-          ? "Compared against this unit's own normal operation."
-          : `Learning this unit's normal operation: ${Math.min(baseline.days, baseline.needed)} of ${baseline.needed} days with enough runtime${baseline.resetAt ? ` (restarted ${baseline.resetAt})` : ""}. Until then, only fixed limits are checked.`}{" "}
-        {!baseline.refrigerantModel &&
-          "Refrigerant pattern checks start once suction, discharge and outdoor probes are fitted and learned."}
+          ? `Compared against this unit's own normal, learned from ${baseline.days} ${baseline.days === 1 ? "day" : "days"} of running (${baseline.confidence ?? "low"} confidence). It keeps learning, so comparisons sharpen as data comes in.`
+          : `Cycle, power, voltage and limit checks are running now. Comparisons with this unit's own normal start after its first full day of running${baseline.resetAt ? ` (learning restarted ${baseline.resetAt})` : ""}.`}
       </p>
     </section>
   );

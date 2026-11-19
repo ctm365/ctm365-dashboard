@@ -127,3 +127,13 @@ test("weather-adjusted energy flags a unit using more power than the weather exp
   assert.equal(coolingDegreeDays([70, 100]), 20);
   assert.ok(chargeIndex({ slt: 2, dlt: 2, kw: -2, dt: -2 }) > 3.9);
 });
+
+test("findings quote today's readings against this unit's normal range", () => {
+  const out = refrigerantFindings({ rows: [], cycles: [], samples: samples({ fault: "low-charge", seed: 8 }), model });
+  const f = out.found.find((x) => x.code === "low-charge");
+  assert.match(f.detail, /Discharge line \d+°F \(normal \d+-\d+°F\)/);
+  assert.match(f.detail, /at \d+°F outdoors\./);
+  const r = out.residuals;
+  assert.ok(r.actual.dlt > r.range.dlt[1], "discharge above its normal range");
+  assert.ok(r.expected.dlt > 150 && r.expected.dlt < 200);
+});

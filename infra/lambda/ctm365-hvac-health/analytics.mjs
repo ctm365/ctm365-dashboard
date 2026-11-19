@@ -29,8 +29,8 @@ export const RULES = {
   sagFraction: 0.08,
   /** Days with at least this much compressor runtime count toward the baseline. */
   baselineMinRuntimeMin: 60,
-  baselineDaysNeeded: 7,
-  baselineDaysMax: 14,
+  /** Days of history kept in the unit's normal (it keeps learning; this only bounds storage). */
+  baselineHistoryDays: 365,
   /** Static pressure rating ceiling for the Bard W42HC (in. w.c.). */
   staticMaxInwc: 0.5,
 };
@@ -272,16 +272,28 @@ export function dayMetrics(rows, baseline) {
 }
 
 /**
- * The unit's normal, from its first qualifying days (median of each metric).
- * days: [{ day: "2026-11-19", metrics }] oldest first. Ready after 7 qualifying
- * days; frozen at 14 so slow wear stays visible against the original normal.
+ * Confidence in the unit's normal grows with the days behind it. With little
+ * history, a reading has to move further from normal before it becomes a
+ * finding, so early days don't raise false alarms.
+ */
+export function confidenceFor(days) {
+  return days >= 7 ? "high" : days >= 3 ? "medium" : "low";
+}
+export const CONFIDENCE_FACTOR = { low: 1.5, medium: 1.2, high: 1 };
+
+/**
+ * The unit's normal: the median of each metric over its days with real
+ * runtime. Usable from the first such day and updated with every day after
+ * (days with serious findings are left out by the caller, so a developing
+ * fault doesn't become "normal"). days: [{ day, metrics }] oldest first.
  */
 export function buildBaseline(days) {
-  const qualifying = days.filter((d) => (d.metrics.runtimeMin ?? 0) >= RULES.baselineMinRuntimeMin).slice(0, RULES.baselineDaysMax);
+  const qualifying = days.filter((d) => (d.metrics.runtimeMin ?? 0) >= RULES.baselineMinRuntimeMin).slice(-RULES.baselineHistoryDays);
   const pick = (k) => round(median(qualifying.map((d) => d.metrics[k])), 3);
   return {
-    ready: qualifying.length >= RULES.baselineDaysNeeded,
+    ready: qualifying.length >= 1,
     days: qualifying.length,
+    confidence: confidenceFor(qualifying.length),
     from: qualifying[0]?.day,
     to: qualifying[qualifying.length - 1]?.day,
     metrics: {
@@ -309,6 +321,8 @@ export function findings({ today, recent = [], baseline, lastSeen, now }) {
   const add = (category, level, code, title, detail, action) => f.push({ category, level, code, title, detail, action });
   const m = today?.metrics ?? {};
   const b = baseline?.ready ? baseline.metrics : undefined;
+  // Less history means a bigger change is needed before it counts.
+  const k = CONFIDENCE_FACTOR[baseline?.confidence ?? "high"] ?? 1;
 
   // Data: is the unit reporting at all?
   if (!lastSeen || now - lastSeen > 3 * 3_600_000) {
@@ -354,11 +368,11 @@ export function findings({ today, recent = [], baseline, lastSeen, now }) {
   if (b) {
     const amps = pct(m.ampsRun, b.ampsRun);
     const pfDrop = m.pf !== undefined && b.pf ? b.pf - m.pf : undefined;
-    if (amps !== undefined && amps > 0.15 && pfDrop !== undefined && pfDrop > 0.05) {
+    if (amps !== undefined && amps > 0.15 * k && pfDrop !== undefined && pfDrop > 0.05 * k) {
       add("electrical", "elevated", "capacitor", "Signs of a weakening run capacitor", `Running current ${fmtPct(amps)} and power factor down ${pfDrop.toFixed(2)} versus this unit's normal.`, "Test the run capacitor; replacing it early prevents compressor damage.");
-    } else if (amps !== undefined && amps > 0.25) {
+    } else if (amps !== undefined && amps > 0.25 * k) {
       add("electrical", "elevated", "high-amps", "Drawing more current than normal", `Running current ${fmtPct(amps)} versus this unit's normal ${b.ampsRun} A.`, "Check condenser coil, refrigerant charge and capacitor.");
-    } else if (amps !== undefined && amps > 0.15) {
+    } else if (amps !== undefined && amps > 0.15 * k) {
       add("electrical", "watch", "high-amps", "Current trending up", `Running current ${fmtPct(amps)} versus normal.`, "Check at the next scheduled visit.");
     }
   }
@@ -368,18 +382,18 @@ export function findings({ today, recent = [], baseline, lastSeen, now }) {
     add("airflow", "elevated", "static-high", "Static pressure above the unit's rating", `${m.staticInwc} in. w.c. while running (rated up to ${RULES.staticMaxInwc}).`, "Replace the filter and check the indoor coil and ductwork.");
   } else if (b && m.staticInwc !== undefined && b.staticInwc) {
     const s = pct(m.staticInwc, b.staticInwc);
-    if (s > 0.5) add("airflow", "elevated", "static-rising", "Airflow restriction", `Static pressure ${fmtPct(s)} versus normal.`, "Replace the filter; if that doesn't fix it, check the indoor coil.");
-    else if (s > 0.25) add("airflow", "watch", "static-rising", "Filter loading", `Static pressure ${fmtPct(s)} versus normal.`, "Plan a filter change.");
-    else if (s < -0.5) add("airflow", "watch", "static-low", "Static pressure unusually low", `Static pressure ${fmtPct(s)} versus normal.`, "Check the blower, belt, and for a disconnected duct or missing filter.");
+    if (s > 0.5 * k) add("airflow", "elevated", "static-rising", "Airflow restriction", `Static pressure ${fmtPct(s)} versus normal.`, "Replace the filter; if that doesn't fix it, check the indoor coil.");
+    else if (s > 0.25 * k) add("airflow", "watch", "static-rising", "Filter loading", `Static pressure ${fmtPct(s)} versus normal.`, "Plan a filter change.");
+    else if (s < -0.5 * k) add("airflow", "watch", "static-low", "Static pressure unusually low", `Static pressure ${fmtPct(s)} versus normal.`, "Check the blower, belt, and for a disconnected duct or missing filter.");
   }
 
   // Capacity and efficiency, compared only in the same mode as the baseline.
   if (b && m.deltaTF !== undefined && b.deltaTF && m.runtimeMin >= RULES.baselineMinRuntimeMin) {
     const d = pct(m.deltaTF, b.deltaTF);
-    if (d < -0.35) add("capacity", "elevated", "deltat-low", "Losing capacity", `Temperature drop across the unit ${fmtPct(d)} versus normal (${m.deltaTF}°F vs ${b.deltaTF}°F).`, "Check refrigerant charge, coil cleanliness and airflow.");
-    else if (d < -0.2) add("capacity", "watch", "deltat-low", "Capacity slipping", `Temperature drop ${fmtPct(d)} versus normal.`, "Check at the next scheduled visit.");
-    const k = pct(m.kwPerDegF, b.kwPerDegF);
-    if (k !== undefined && k > 0.2) add("capacity", "watch", "efficiency", "Using more power for the same work", `Power per degree of temperature change ${fmtPct(k)} versus normal.`, "Usually a dirty coil or charge problem; check at the next visit.");
+    if (d < -0.35 * k) add("capacity", "elevated", "deltat-low", "Losing capacity", `Temperature drop across the unit ${fmtPct(d)} versus normal (${m.deltaTF}°F vs ${b.deltaTF}°F).`, "Check refrigerant charge, coil cleanliness and airflow.");
+    else if (d < -0.2 * k) add("capacity", "watch", "deltat-low", "Capacity slipping", `Temperature drop ${fmtPct(d)} versus normal.`, "Check at the next scheduled visit.");
+    const e = pct(m.kwPerDegF, b.kwPerDegF);
+    if (e !== undefined && e > 0.2 * k) add("capacity", "watch", "efficiency", "Using more power for the same work", `Power per degree of temperature change ${fmtPct(e)} versus normal.`, "Usually a dirty coil or charge problem; check at the next visit.");
   }
 
   // Sustained trend: the same problem on most of the last 7 days raises its level by one.

@@ -23,8 +23,11 @@ export const REF_RULES = {
   settleMin: 5,
   /** Keep every Nth settled minute per day, to bound storage. */
   sampleEvery: 3,
-  /** Samples and outdoor range needed before outdoor temperature gets its own term. */
-  minSamples: 300,
+  /**
+   * Settled running samples (one every 3 minutes) before comparisons start:
+   * about 3 hours of compressor running. Confidence then grows with more data.
+   */
+  minSamples: 60,
   minOutdoorRangeF: 10,
   /**
    * Signature matching. Pattern strength is the size of the day's residuals in
@@ -129,44 +132,97 @@ function fit(xs, ys) {
   return { intercept, slopes: w };
 }
 
-const mad = (values) => {
-  const s = [...values].sort((a, b) => a - b);
-  const med = s[Math.floor(s.length / 2)];
-  const dev = s.map((x) => Math.abs(x - med)).sort((a, b) => a - b);
-  return 1.4826 * dev[Math.floor(dev.length / 2)];
-};
+/**
+ * Running totals per mode ("c" cooling, "h" heating), so the model keeps
+ * learning from every day without re-reading history. Each new day's samples
+ * are added once; the model is solved from the totals.
+ */
+export function emptyRefStats() {
+  return {};
+}
+
+export function addRefSamples(stats, samples) {
+  const out = structuredClone(stats ?? {});
+  for (const x of samples) {
+    const mode = x[6];
+    const s = (out[mode] ??= {
+      n: 0, sx: [0, 0], sxx: [[0, 0], [0, 0]], sy: {}, sxy: {}, syy: {},
+      oatMin: Infinity, oatMax: -Infinity, ratMin: Infinity, ratMax: -Infinity,
+    });
+    const f = [x[0], x[1]];
+    s.n += 1;
+    for (let a = 0; a < 2; a++) {
+      s.sx[a] += f[a];
+      for (let b = 0; b < 2; b++) s.sxx[a][b] += f[a] * f[b];
+    }
+    TARGETS.forEach((t, i) => {
+      const y = x[2 + i];
+      s.sy[t] = (s.sy[t] ?? 0) + y;
+      s.syy[t] = (s.syy[t] ?? 0) + y * y;
+      s.sxy[t] = s.sxy[t] ?? [0, 0];
+      s.sxy[t][0] += f[0] * y;
+      s.sxy[t][1] += f[1] * y;
+    });
+    s.oatMin = Math.min(s.oatMin, f[0]);
+    s.oatMax = Math.max(s.oatMax, f[0]);
+    s.ratMin = Math.min(s.ratMin, f[1]);
+    s.ratMax = Math.max(s.ratMax, f[1]);
+  }
+  return out;
+}
+
+/** Confidence in the refrigerant model, from how many settled running samples it has seen. */
+export function refConfidence(samples) {
+  return samples >= 1500 ? "high" : samples >= 300 ? "medium" : "low";
+}
 
 /**
- * Fits the unit's normal refrigerant behaviour from baseline samples.
- * Returns { cooling?, heating? }, each { terms, coef: {slt,dlt,kw,dt}, scatter, samples }.
+ * Solves the unit's normal refrigerant behaviour from running totals.
+ * Returns { cooling?, heating? }, each { terms, coef: {slt,dlt,kw,dt}, scatter, samples, confidence }.
  */
-export function buildRefrigerantModel(samples) {
+export function modelFromStats(stats) {
   const model = {};
   for (const [mode, key] of [["c", "cooling"], ["h", "heating"]]) {
-    const s = samples.filter((x) => x[6] === mode);
-    if (s.length < REF_RULES.minSamples) continue;
-    const oats = s.map((x) => x[0]);
-    const useOutdoor = Math.max(...oats) - Math.min(...oats) >= REF_RULES.minOutdoorRangeF;
-    const rats = s.map((x) => x[1]);
-    const useReturn = Math.max(...rats) - Math.min(...rats) >= 3;
-    const terms = [useOutdoor && "outdoor", useReturn && "return"].filter(Boolean);
-    const xs = s.map((x) => [useOutdoor ? x[0] : null, useReturn ? x[1] : null].filter((v) => v !== null));
+    const s = stats?.[mode];
+    if (!s || s.n < REF_RULES.minSamples) continue;
+    const useOutdoor = s.oatMax - s.oatMin >= REF_RULES.minOutdoorRangeF;
+    const useReturn = s.ratMax - s.ratMin >= 3;
+    const idx = [useOutdoor && 0, useReturn && 1].filter((v) => v !== false);
+    const terms = idx.map((j) => (j === 0 ? "outdoor" : "return"));
+    const n = s.n;
+    const mx = idx.map((j) => s.sx[j] / n);
+    // Centred cross-products of the chosen terms.
+    const A = idx.map((a, ai) => idx.map((b, bi) => s.sxx[a][b] - n * mx[ai] * mx[bi]));
+    for (let a = 0; a < A.length; a++) A[a][a] += 1e-6 * n + 1e-9;
     const coef = {};
     const scatter = {};
-    TARGETS.forEach((t, i) => {
-      const ys = s.map((x) => x[2 + i]);
-      const mean = { intercept: ys.reduce((a, b) => a + b, 0) / ys.length, slopes: [] };
-      let f = terms.length ? fit(xs, ys) : mean;
-      // DynamoDB can't store NaN; if the terms can't be separated, fall back to the plain average.
-      if (![f.intercept, ...f.slopes].every(Number.isFinite)) f = { intercept: mean.intercept, slopes: f.slopes.map(() => 0) };
-      coef[t] = f;
-      const resid = s.map((x, n) => ys[n] - predictOne(f, xs[n]));
-      // Floor the scatter so a very steady baseline doesn't turn tiny changes into big scores.
-      scatter[t] = Math.max(mad(resid), REF_RULES.scatterFloor[t]);
-    });
-    model[key] = { terms, coef, scatter, samples: s.length };
+    for (const t of TARGETS) {
+      const my = s.sy[t] / n;
+      const v = idx.map((j, ji) => s.sxy[t][j] - n * mx[ji] * my);
+      let w = [];
+      if (idx.length === 1) w = [v[0] / A[0][0]];
+      else if (idx.length === 2) {
+        const det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+        w = [(v[0] * A[1][1] - v[1] * A[0][1]) / det, (A[0][0] * v[1] - A[1][0] * v[0]) / det];
+      }
+      if (!w.every(Number.isFinite)) w = w.map(() => 0);
+      const intercept = my - w.reduce((acc, wj, j) => acc + wj * mx[j], 0);
+      coef[t] = { intercept, slopes: w };
+      // Residual spread from the totals: (Syy - w . Sxy) / (n - terms - 1).
+      const syy = s.syy[t] - n * my * my;
+      const sse = Math.max(0, syy - w.reduce((acc, wj, j) => acc + wj * v[j], 0));
+      const sd = Math.sqrt(sse / Math.max(1, n - idx.length - 1));
+      // Floor the scatter so a very steady unit can't turn tiny changes into big scores.
+      scatter[t] = Math.max(Number.isFinite(sd) ? sd : 0, REF_RULES.scatterFloor[t]);
+    }
+    model[key] = { terms, coef, scatter, samples: n, confidence: refConfidence(n) };
   }
   return model;
+}
+
+/** Fits a model straight from samples (same result as adding them to empty totals). */
+export function buildRefrigerantModel(samples) {
+  return modelFromStats(addRefSamples(emptyRefStats(), samples));
 }
 
 function predictOne(f, x) {
@@ -182,24 +238,51 @@ const median = (v) => {
   return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : undefined;
 };
 
-/** Today's median residual per measure, in units of normal scatter (a z-like score). */
+const r1 = (v) => Math.round(v * 10) / 10;
+
+/**
+ * Today's median residual per measure, in units of normal scatter (a z-like
+ * score), plus today's typical reading, what this unit normally reads in the
+ * same conditions, and its normal range (expected ± 2 x normal scatter).
+ */
 export function dayResiduals(model, samples, mode = "cooling") {
   const m = model?.[mode];
   const s = samples.filter((x) => x[6] === (mode === "cooling" ? "c" : "h"));
   if (!m || s.length < 20) return undefined;
   const z = {};
+  const actual = {};
+  const expected = {};
+  const range = {};
   TARGETS.forEach((t, i) => {
-    const resid = s.map((x) => x[2 + i] - predictOne(m.coef[t], featuresFor(m, x)));
+    const predicted = s.map((x) => predictOne(m.coef[t], featuresFor(m, x)));
+    const resid = s.map((x, n) => x[2 + i] - predicted[n]);
     z[t] = Math.round((median(resid) / m.scatter[t]) * 100) / 100;
+    actual[t] = r1(median(s.map((x) => x[2 + i])));
+    expected[t] = r1(median(predicted));
+    range[t] = [r1(expected[t] - 2 * m.scatter[t]), r1(expected[t] + 2 * m.scatter[t])];
   });
-  return { z, samples: s.length };
+  return { z, actual, expected, range, outdoorF: r1(median(s.map((x) => x[0]))), mode, samples: s.length };
+}
+
+const LABEL = { slt: "Suction line", dlt: "Discharge line", kw: "Unit power", dt: "Air ΔT" };
+const UNIT = { slt: "°F", dlt: "°F", kw: " kW", dt: "°F" };
+
+/** "Discharge line 198°F; normal for this unit at 92°F outdoors is 166-178°F." for the measures that moved most. */
+export function describeVsNormal(day, count = 2) {
+  if (!day?.actual) return "";
+  const moved = [...TARGETS].sort((a, b) => Math.abs(day.z[b]) - Math.abs(day.z[a])).slice(0, count);
+  const parts = moved.map((t) => {
+    const fmt = (v) => (t === "kw" ? v.toFixed(2) : Math.round(v));
+    return `${LABEL[t]} ${fmt(day.actual[t])}${UNIT[t]} (normal ${fmt(day.range[t][0])}-${fmt(day.range[t][1])}${UNIT[t]})`;
+  });
+  return `${parts.join("; ")} at ${Math.round(day.outdoorF)}°F outdoors.`;
 }
 
 /** Best-matching fault signature for a residual pattern, if any. */
-export function matchSignature(z) {
+export function matchSignature(z, minMagnitude = REF_RULES.minMagnitude) {
   const v = TARGETS.map((t) => z[t] ?? 0);
   const mag = Math.hypot(...v);
-  if (mag < REF_RULES.minMagnitude) return undefined;
+  if (mag < minMagnitude) return undefined;
   let best;
   for (const [code, sig] of Object.entries(SIGNATURES)) {
     const s = sig.vector;
@@ -260,11 +343,21 @@ export function refrigerantFindings({ rows, cycles, samples, model, recentIndex 
   const day = dayResiduals(model, samples, "cooling");
   if (!day) return { found, residuals: undefined };
 
-  const match = matchSignature(day.z);
+  // Less data behind the model means a pattern has to be stronger to count.
+  const k = { low: 1.5, medium: 1.2, high: 1 }[model?.cooling?.confidence ?? "high"] ?? 1;
+  const match = matchSignature(day.z, REF_RULES.minMagnitude * k);
   if (match) {
     const sig = SIGNATURES[match.code];
-    const level = match.magnitude >= REF_RULES.actionMagnitude ? "action" : match.magnitude >= REF_RULES.elevatedMagnitude ? "elevated" : "watch";
-    found.push({ category: "refrigerant", level, code: match.code, title: sig.title, detail: `${sig.detail} (pattern strength ${match.magnitude}, match ${Math.round(match.similarity * 100)}%.)`, action: sig.action });
+    const level =
+      match.magnitude >= REF_RULES.actionMagnitude * k ? "action" : match.magnitude >= REF_RULES.elevatedMagnitude * k ? "elevated" : "watch";
+    found.push({
+      category: "refrigerant",
+      level,
+      code: match.code,
+      title: sig.title,
+      detail: `${describeVsNormal(day)} ${sig.detail} (Pattern strength ${match.magnitude}, ${Math.round(match.similarity * 100)}% match.)`,
+      action: sig.action,
+    });
   }
 
   const idx = chargeIndex(day.z);
@@ -273,7 +366,11 @@ export function refrigerantFindings({ rows, cycles, samples, model, recentIndex 
   if (series.length >= 10 && slope > 0.1 && idx > 1 && !found.some((f) => f.code === "low-charge")) {
     found.push({ category: "refrigerant", level: "watch", code: "charge-drift", title: "Refrigerant charge may be drifting down", detail: `The low-charge pattern has grown steadily over the last ${series.length} days (about ${slope.toFixed(2)} per day). A slow leak looks like this.`, action: "Leak-check at the next visit before it becomes a no-cool call." });
   }
-  return { found, residuals: { ...day.z, chargeIndex: idx } };
+  return {
+    found,
+    // z scores (as before), the charge index, and today's typical readings vs this unit's normal.
+    residuals: { ...day.z, chargeIndex: idx, actual: day.actual, expected: day.expected, range: day.range, outdoorF: day.outdoorF },
+  };
 }
 
 /**

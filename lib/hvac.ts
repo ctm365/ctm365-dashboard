@@ -51,6 +51,10 @@ function toReading(item: Record<string, unknown>): HvacReading | null {
     powerFactor: num(item.power_factor),
     frequencyHz: num(item.frequency_hz),
     energyKwh: num(item.energy_kwh),
+    suctionLineF: num(item.suction_line_temp_f),
+    dischargeLineF: num(item.discharge_line_temp_f),
+    liquidLineF: num(item.liquid_line_temp_f),
+    outdoorF: num(item.outdoor_air_temp_f),
   };
 }
 

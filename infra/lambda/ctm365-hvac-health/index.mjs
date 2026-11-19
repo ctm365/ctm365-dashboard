@@ -2,10 +2,11 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { buildBaseline, dayMetrics, findings, health, RULES, toRow } from "./analytics.mjs";
 import {
-  buildRefrigerantModel,
+  addRefSamples,
   coolingDegreeDays,
   energyFinding,
   energyModel,
+  modelFromStats,
   refrigerantFindings,
   refrigerantSamples,
 } from "./refrigerant.mjs";
@@ -96,21 +97,62 @@ const slimCycle = (c) => ({
   ampsRun: c.ampsRun, voltsMin: c.voltsMin, voltsAtStop: c.voltsAtStop, deltaTF: c.deltaTF, mode: c.mode,
 });
 
+/** Categories where a serious finding means the day shouldn't be learned as normal. */
+const NOT_NORMAL = new Set(["cycling", "airflow", "capacity", "refrigerant"]);
+const seriousDay = (d) => (d.findings ?? []).some((f) => NOT_NORMAL.has(f.category) && (f.level === "elevated" || f.level === "action"));
+
+/**
+ * Adds every finished day not yet learned (after any reset) to the baseline's
+ * running records, in place. A day counts as finished once it has been
+ * analysed after its own midnight. Returns how many days were added.
+ */
+export function learnFinishedDays(baseline, days, todayKey) {
+  if (!baseline) return 0;
+  let added = 0;
+  baseline.dayMetrics ??= [];
+  baseline.energyDays ??= [];
+  for (const d of days) {
+    if (d.day >= todayKey) continue;
+    if (baseline.resetAt && d.day < baseline.resetAt) continue;
+    if (baseline.lastLearnedDay && d.day <= baseline.lastLearnedDay) continue;
+    const nextMidnight = dayStart(dayKey(dayStart(d.day, env.timeZone) + 36 * 3_600_000, env.timeZone), env.timeZone);
+    if (!(Date.parse(d.computedAt) >= nextMidnight)) continue; // not final yet
+    if (!seriousDay(d)) {
+      baseline.dayMetrics.push({ day: d.day, metrics: d.metrics });
+      if (d.refSamples?.length) baseline.refStats = addRefSamples(baseline.refStats ?? {}, d.refSamples);
+      if (Number.isFinite(d.metrics?.kwh) && Number.isFinite(d.metrics?.cdd)) baseline.energyDays.push({ kwh: d.metrics.kwh, cdd: d.metrics.cdd });
+    }
+    baseline.lastLearnedDay = d.day;
+    added++;
+  }
+  baseline.dayMetrics = baseline.dayMetrics.slice(-RULES.baselineHistoryDays);
+  baseline.energyDays = baseline.energyDays.slice(-RULES.baselineHistoryDays);
+  return added;
+}
+
+/** The unit's normal from its running records. */
+export function rebuildBaseline(baseline) {
+  return {
+    ...buildBaseline(baseline?.dayMetrics ?? []),
+    refrigerant: modelFromStats(baseline?.refStats ?? {}),
+    energy: energyModel(baseline?.energyDays ?? []),
+  };
+}
+
 export async function analyseUnit({ unitId, name, customerId }, now = Date.now()) {
   const todayKey = dayKey(now, env.timeZone);
   const yesterdayKey = dayKey(dayStart(todayKey, env.timeZone) - 1, env.timeZone);
 
-  // Read only what this run needs, so cost stays flat as history grows:
-  // the baseline and latest records, plus recent days (or, while the unit is
-  // still learning, every day since learning started).
+  // Read only what this run needs, so cost stays flat as history grows: the
+  // baseline (which carries compact running totals of everything learned) and
+  // latest records, plus the last few weeks of days for trends.
   // Two direct reads: in sort-key order, "day#..." falls between "baseline" and "latest".
   const [baselineOut, latestOut] = await Promise.all(
     ["baseline", "latest"].map((sk) => db.send(new GetCommand({ TableName: env.analytics, Key: { unit_id: unitId, sk } }))),
   );
-  let baseline = baselineOut.Item;
+  let baseline = baselineOut.Item ?? { unit_id: unitId, sk: "baseline", customer_id: customerId };
   const previousLatest = latestOut.Item;
-  const learning = !baseline || (baseline.days ?? 0) < RULES.baselineDaysMax;
-  const fromDay = learning ? (baseline?.resetAt ?? "0000-00-00") : dayKey(dayStart(todayKey, env.timeZone) - RECENT_DAYS * 86_400_000, env.timeZone);
+  const fromDay = dayKey(dayStart(todayKey, env.timeZone) - RECENT_DAYS * 86_400_000, env.timeZone);
   const days = (
     await queryAll({
       TableName: env.analytics,
@@ -142,9 +184,10 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
       .filter((d) => d.sk < `day#${key}` && Number.isFinite(d.refResiduals?.chargeIndex))
       .slice(-13)
       .map((d, i) => ({ x: i, y: d.refResiduals.chargeIndex }));
-    const ref = refrigerantFindings({ rows, cycles: day.cycles, samples: refSamples, model: usable?.refrigerant, recentIndex });
+    // The refrigerant and energy models have their own readiness (they need line probes / outdoor air).
+    const ref = refrigerantFindings({ rows, cycles: day.cycles, samples: refSamples, model: baseline?.refrigerant, recentIndex });
     found.push(...ref.found);
-    const energy = energyFinding(usable?.energy, { kwh: day.metrics.kwh, cdd });
+    const energy = energyFinding(baseline?.energy, { kwh: day.metrics.kwh, cdd });
     if (energy) found.push(energy);
     results[key] = { day, found, lastSeen };
 
@@ -161,18 +204,12 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
     }
   }
 
-  // Keep learning until the baseline is frozen at its maximum number of days.
-  if (!baseline || (baseline.days ?? 0) < RULES.baselineDaysMax) {
-    const learnFrom = baseline?.resetAt ? days.filter((d) => d.day >= baseline.resetAt) : days;
-    const learned = buildBaseline(learnFrom.map((d) => ({ day: d.day, metrics: d.metrics })));
-    // The refrigerant and energy models learn from the same days as the rest of the baseline.
-    const baselineDays = learnFrom.filter((d) => (d.metrics.runtimeMin ?? 0) >= RULES.baselineMinRuntimeMin).slice(0, RULES.baselineDaysMax);
-    baseline = {
-      unit_id: unitId, sk: "baseline", customer_id: customerId, ...learned,
-      refrigerant: buildRefrigerantModel(baselineDays.flatMap((d) => d.refSamples ?? [])),
-      energy: energyModel(baselineDays.map((d) => ({ kwh: d.metrics.kwh, cdd: d.metrics.cdd }))),
-      resetAt: baseline?.resetAt, updatedAt: new Date(now).toISOString(),
-    };
+  // Keep learning, always: every finished day is added once to the unit's
+  // normal, unless something serious was found that day (so a developing
+  // fault doesn't become "normal"). "Start learning again" clears it all.
+  const learned = learnFinishedDays(baseline, days, todayKey);
+  if (learned || !baseline?.metrics) {
+    baseline = { ...baseline, ...rebuildBaseline(baseline), unit_id: unitId, sk: "baseline", customer_id: customerId, updatedAt: new Date(now).toISOString() };
     await db.send(new PutCommand({ TableName: env.analytics, Item: baseline }));
   }
 
@@ -185,8 +222,11 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
         unit_id: unitId, sk: "latest", customer_id: customerId, name,
         ...h, findings: today.found, metrics: today.day.metrics, lastSeen: today.lastSeen,
         baseline: {
-          ready: baseline.ready, days: baseline.days, needed: RULES.baselineDaysNeeded, from: baseline.from, to: baseline.to, metrics: baseline.metrics,
-          refrigerantModel: Boolean(baseline.refrigerant?.cooling || baseline.refrigerant?.heating), energyModel: Boolean(baseline.energy),
+          ready: baseline.ready, days: baseline.days, confidence: baseline.confidence, from: baseline.from, to: baseline.to, metrics: baseline.metrics,
+          refrigerantModel: Boolean(baseline.refrigerant?.cooling || baseline.refrigerant?.heating),
+          refrigerantConfidence: baseline.refrigerant?.cooling?.confidence ?? baseline.refrigerant?.heating?.confidence,
+          refrigerantSamples: (baseline.refStats?.c?.n ?? 0) + (baseline.refStats?.h?.n ?? 0),
+          energyModel: Boolean(baseline.energy),
         },
         refResiduals: results[todayKey] && days.find((d) => d.sk === `day#${todayKey}`)?.refResiduals,
         computedAt: new Date(now).toISOString(),

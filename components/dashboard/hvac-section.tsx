@@ -182,6 +182,20 @@ function HvacUnitCard({
     { label: "Energy", value: fmt(latest(rows, "energyKwh"), 1), unit: "kWh", hint: "Meter total" },
   ];
 
+  // Strap-on refrigerant line probes and outdoor air: shown only once they report.
+  const suction = latest(rows, "suctionLineF");
+  const discharge = latest(rows, "dischargeLineF");
+  const liquid = latest(rows, "liquidLineF");
+  const outdoor = latest(rows, "outdoorF");
+  if (suction != null) tiles.push({ label: "Suction line", value: fmt(suction, 1), unit: "°F" });
+  if (discharge != null) tiles.push({ label: "Discharge line", value: fmt(discharge, 1), unit: "°F" });
+  if (suction != null && discharge != null) {
+    tiles.push({ label: "Compressor lift", value: fmt(discharge - suction, 1), unit: "°F", hint: "Discharge minus suction line" });
+  }
+  if (liquid != null) tiles.push({ label: "Liquid line", value: fmt(liquid, 1), unit: "°F" });
+  if (outdoor != null) tiles.push({ label: "Outdoor air", value: fmt(outdoor, 1), unit: "°F" });
+  const hasLineProbes = suction != null || discharge != null || liquid != null || outdoor != null;
+
   const chartData = useMemo(
     () =>
       rows.map((r) => ({
@@ -191,6 +205,10 @@ function HvacUnitCard({
         static: r.staticInwc,
         amps: r.currentA,
         kw: r.powerW == null ? undefined : Math.round(r.powerW / 10) / 100,
+        slt: r.suctionLineF,
+        dlt: r.dischargeLineF,
+        llt: r.liquidLineF,
+        oat: r.outdoorF,
       })),
     [rows],
   );
@@ -263,6 +281,21 @@ function HvacUnitCard({
               digits={2}
               series={[{ key: "kw", label: "Power", color: "var(--color-ok)" }]}
             />
+            {hasLineProbes && (
+              <TrendChart
+                title="Refrigerant lines and outdoor air"
+                data={chartData}
+                withDate={withDate}
+                unit="°F"
+                digits={1}
+                series={[
+                  { key: "dlt", label: "Discharge", color: "var(--color-critical)" },
+                  { key: "llt", label: "Liquid", color: "var(--color-watch)" },
+                  { key: "oat", label: "Outdoor", color: "var(--color-muted)" },
+                  { key: "slt", label: "Suction", color: "var(--color-brand)" },
+                ].filter((sr) => chartData.some((d) => d[sr.key as keyof typeof d] != null))}
+              />
+            )}
           </div>
         </>
       )}

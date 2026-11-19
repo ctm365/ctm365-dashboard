@@ -87,6 +87,11 @@ export interface HvacReading {
   powerFactor?: number;
   frequencyHz?: number;
   energyKwh?: number;
+  /** Strap-on refrigerant line probes and outdoor air (optional add-ons). */
+  suctionLineF?: number;
+  dischargeLineF?: number;
+  liquidLineF?: number;
+  outdoorF?: number;
 }
 
 export interface HvacUnitData {
@@ -143,7 +148,27 @@ export interface HvacHealth {
   score: number;
   categories: Record<HealthCategory, HealthLevel>;
   findings: HvacFinding[];
-  baseline: { ready: boolean; days: number; needed: number; refrigerantModel: boolean; resetAt?: string };
+  /** The unit's learned normal. It keeps learning; confidence grows with days of data. */
+  baseline: {
+    ready: boolean;
+    days: number;
+    confidence?: "low" | "medium" | "high";
+    refrigerantModel: boolean;
+    refrigerantConfidence?: "low" | "medium" | "high";
+    /** Settled running samples seen with line probes (about 60 = 3 hours starts the comparison). */
+    refrigerantSamples: number;
+    resetAt?: string;
+  };
+  /** Today's typical refrigerant readings vs this unit's normal, when line probes are fitted. */
+  refrigerant?: {
+    actual: Record<"slt" | "dlt" | "kw" | "dt", number>;
+    expected: Record<"slt" | "dlt" | "kw" | "dt", number>;
+    range: Record<"slt" | "dlt" | "kw" | "dt", [number, number]>;
+    outdoorF: number;
+    chargeIndex: number;
+  };
+  /** Daily low-charge pattern strength for the last two weeks, oldest first (a slow leak rises). */
+  chargeHistory: { day: string; value: number }[];
   computedAt: string;
   /** Start of today in the site's time zone (epoch ms), for the cycle timeline. */
   dayStart: number;
