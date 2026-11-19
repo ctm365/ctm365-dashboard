@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { buildBaseline, dayMetrics, findings, health, RULES, toRow } from "./analytics.mjs";
 import {
   buildRefrigerantModel,
@@ -28,6 +28,9 @@ const env = {
   analytics: process.env.ANALYTICS_TABLE ?? "ctm365_hvac_analytics",
   timeZone: process.env.TIME_ZONE ?? "America/Los_Angeles",
 };
+
+/** Days of history read for trends once the baseline is learned (findings use the last 7-14). */
+const RECENT_DAYS = 20;
 
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } });
 
@@ -94,23 +97,41 @@ const slimCycle = (c) => ({
 });
 
 export async function analyseUnit({ unitId, name, customerId }, now = Date.now()) {
-  const stored = await queryAll({ TableName: env.analytics, KeyConditionExpression: "unit_id = :u", ExpressionAttributeValues: { ":u": unitId } });
-  const days = stored.filter((i) => i.sk.startsWith("day#")).sort((a, b) => a.sk.localeCompare(b.sk));
-  let baseline = stored.find((i) => i.sk === "baseline");
-
   const todayKey = dayKey(now, env.timeZone);
   const yesterdayKey = dayKey(dayStart(todayKey, env.timeZone) - 1, env.timeZone);
+
+  // Read only what this run needs, so cost stays flat as history grows:
+  // the baseline and latest records, plus recent days (or, while the unit is
+  // still learning, every day since learning started).
+  // Two direct reads: in sort-key order, "day#..." falls between "baseline" and "latest".
+  const [baselineOut, latestOut] = await Promise.all(
+    ["baseline", "latest"].map((sk) => db.send(new GetCommand({ TableName: env.analytics, Key: { unit_id: unitId, sk } }))),
+  );
+  let baseline = baselineOut.Item;
+  const previousLatest = latestOut.Item;
+  const learning = !baseline || (baseline.days ?? 0) < RULES.baselineDaysMax;
+  const fromDay = learning ? (baseline?.resetAt ?? "0000-00-00") : dayKey(dayStart(todayKey, env.timeZone) - RECENT_DAYS * 86_400_000, env.timeZone);
+  const days = (
+    await queryAll({
+      TableName: env.analytics,
+      KeyConditionExpression: "unit_id = :u AND sk BETWEEN :a AND :b",
+      ExpressionAttributeValues: { ":u": unitId, ":a": `day#${fromDay}`, ":b": `day#${todayKey}` },
+    })
+  ).sort((a, b) => a.sk.localeCompare(b.sk));
   const results = {};
 
-  // Yesterday first (late data may still arrive), then today.
-  for (const key of [yesterdayKey, todayKey]) {
+  // Yesterday is re-checked once, on the first run after midnight (late data may
+  // still have arrived); after that only today is analysed.
+  const yesterdayDone = days.some((d) => d.day === yesterdayKey && Date.parse(d.computedAt) >= dayStart(todayKey, env.timeZone));
+  const analysed = yesterdayDone ? [todayKey] : [yesterdayKey, todayKey];
+  for (const key of analysed) {
     const from = dayStart(key, env.timeZone);
     const to = key === todayKey ? now : dayStart(todayKey, env.timeZone);
     const rows = await telemetryRows(unitId, from, to);
     const usable = baseline?.ready ? baseline : undefined;
     const day = dayMetrics(rows, usable);
     const recent = days.filter((d) => d.sk < `day#${key}`).slice(-7);
-    const lastSeen = rows.length ? rows[rows.length - 1].ts : (baseline?.lastSeen ?? stored.find((i) => i.sk === "latest")?.lastSeen);
+    const lastSeen = rows.length ? rows[rows.length - 1].ts : previousLatest?.lastSeen;
     const dayNow = key === todayKey ? now : to;
     const found = rows.length || key === todayKey ? findings({ today: day, recent, baseline: usable, lastSeen, now: dayNow }) : [];
 
@@ -172,7 +193,7 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
       },
     }),
   );
-  return { unitId, status: h.status, score: h.score, findings: today.found.length, cycles: today.day.metrics.cycles, baselineDays: baseline.days };
+  return { unitId, analysed, status: h.status, score: h.score, findings: today.found.length, cycles: today.day.metrics.cycles, baselineDays: baseline.days };
 }
 
 export async function handler(event) {
