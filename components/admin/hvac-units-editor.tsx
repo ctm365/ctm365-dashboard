@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { addHvacUnit, removeHvacUnit, renameHvacUnit, type ConfigResult } from "@/app/admin/actions";
+import { addHvacUnit, removeHvacUnit, renameHvacUnit, restartUnitLearning, type ConfigResult } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CustomerConfig } from "@/lib/config/types";
@@ -23,6 +23,7 @@ export function HvacUnitsEditor({
   const [unitId, setUnitId] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
   const [pending, startTransition] = useTransition();
 
   function run(action: () => Promise<ConfigResult>, after?: () => void) {
@@ -47,6 +48,23 @@ export function HvacUnitsEditor({
         setName("");
       },
     );
+  }
+
+  function onRestartLearning(id: string, unitName: string) {
+    if (
+      !window.confirm(
+        `Start learning "${unitName}" again from today? Its health checks go back to fixed limits until about 7 days of normal running are learned. Use this for a new install, after major repairs, or after adding line probes.`,
+      )
+    ) {
+      return;
+    }
+    setError(undefined);
+    setNotice(undefined);
+    startTransition(async () => {
+      const result = await restartUnitLearning(customerId, id);
+      if (!result.ok) setError(result.error);
+      else setNotice(`${unitName} is learning again from ${result.resetAt}.`);
+    });
   }
 
   function onRemove(id: string, unitName: string) {
@@ -83,6 +101,15 @@ export function HvacUnitsEditor({
                 />
               </span>
               <span className="tabular text-xs text-muted">{u.id}</span>
+              <Button
+                variant="ghost"
+                className="h-8 px-3"
+                disabled={pending}
+                title="Re-learn this unit's normal operation from today (new install, major repair, or new probes)"
+                onClick={() => onRestartLearning(u.id, u.name)}
+              >
+                Start learning again
+              </Button>
               <Button
                 variant="ghost"
                 className="h-8 px-3 hover:text-critical"
@@ -134,6 +161,7 @@ export function HvacUnitsEditor({
         </p>
         <div aria-live="assertive">
           {error && <p className="rounded-md bg-critical-soft px-3 py-2 text-sm text-critical">{error}</p>}
+          {notice && <p className="text-sm text-ok">{notice}</p>}
         </div>
       </form>
     </Card>

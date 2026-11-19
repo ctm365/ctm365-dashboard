@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadHealthAndRestartLearning",
+      "Effect": "Allow",
+      "Action": ["dynamodb:BatchGetItem", "dynamodb:GetItem", "dynamodb:PutItem"],
+      "Resource": "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_hvac_analytics"
+    }
+  ]
+}

@@ -93,3 +93,38 @@ export interface Thresholds {
   watchC: number;
   criticalC: number;
 }
+
+/** HVAC health from the hourly analytics job (ctm365_hvac_analytics). */
+export type HealthLevel = "good" | "watch" | "elevated" | "action";
+export type HealthCategory = "cycling" | "electrical" | "airflow" | "capacity" | "refrigerant" | "data";
+
+export interface HvacFinding {
+  category: HealthCategory;
+  level: HealthLevel;
+  code: string;
+  title: string;
+  detail: string;
+  action: string;
+}
+
+/** One compressor run, and why it stopped. */
+export interface HvacCycle {
+  start: number;
+  end: number;
+  runMin: number;
+  cause: string;
+  detail: string;
+}
+
+export interface HvacHealth {
+  unitId: string;
+  status: HealthLevel;
+  score: number;
+  categories: Record<HealthCategory, HealthLevel>;
+  findings: HvacFinding[];
+  baseline: { ready: boolean; days: number; needed: number; refrigerantModel: boolean; resetAt?: string };
+  computedAt: string;
+  /** Start of today in the site's time zone (epoch ms), for the cycle timeline. */
+  dayStart: number;
+  cycles: HvacCycle[];
+}

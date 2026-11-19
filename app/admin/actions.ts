@@ -12,6 +12,7 @@ import {
   updateCustomerConfig,
 } from "@/lib/config/store";
 import type { CustomerConfig } from "@/lib/config/types";
+import { restartLearning } from "@/lib/hvac-health";
 import {
   CUSTOMER_ID_MAX_LENGTH,
   ConfigInputError,
@@ -369,4 +370,28 @@ export async function deleteCustomer(
   }
   revalidatePath("/admin");
   redirect("/admin?deleted=1");
+}
+
+/**
+ * Restarts what the health analytics treat as this unit's normal: it is
+ * re-learned from today's data on. For a new install, after major repairs,
+ * or after adding line probes.
+ */
+export async function restartUnitLearning(
+  customerId: string,
+  unitId: string,
+): Promise<{ ok: true; resetAt: string } | { ok: false; error: string }> {
+  await requireAdminAction();
+  try {
+    const id = parseCustomerId(customerId);
+    const config = await getCustomerConfig(id);
+    if (!config) return { ok: false, error: "This customer no longer exists." };
+    findHvacUnit(config, unitId);
+    const resetAt = await restartLearning(id, unitId);
+    console.info(`[admin] restarted learning for ${JSON.stringify(id)}/${unitId}`);
+    return { ok: true, resetAt };
+  } catch (err) {
+    const result = failure("restartUnitLearning", err);
+    return { ok: false, error: result.ok ? "Couldn't restart learning." : result.error };
+  }
 }

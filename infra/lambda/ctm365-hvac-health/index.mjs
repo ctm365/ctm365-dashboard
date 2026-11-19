@@ -134,7 +134,10 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
     };
     if (rows.length) await db.send(new PutCommand({ TableName: env.analytics, Item: item }));
     const i = days.findIndex((d) => d.sk === item.sk);
-    if (rows.length) i >= 0 ? (days[i] = item) : days.push(item);
+    if (rows.length) {
+      if (i >= 0) days[i] = item;
+      else days.push(item);
+    }
   }
 
   // Keep learning until the baseline is frozen at its maximum number of days.

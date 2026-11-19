@@ -21,11 +21,11 @@ def convert(p):
     out = {}
     def has(k):
         return k in p and p[k] is not None
-    # ADAM-4015 (0 = no response from module)
-    if has("SupplyAir") and p["SupplyAir"] > 0:
+    # ADAM-4015 (0 = no response from module, 65535 = open or unplugged probe)
+    if has("SupplyAir") and 0 < p["SupplyAir"] < 65535:
         out["air_supply_temp_f"] = d(adam_f(p["SupplyAir"]), 2)
         out["air_supply_raw"] = int(p["SupplyAir"])
-    if has("ReturnAir") and p["ReturnAir"] > 0:
+    if has("ReturnAir") and 0 < p["ReturnAir"] < 65535:
         out["air_return_temp_f"] = d(adam_f(p["ReturnAir"]), 2)
         out["air_return_raw"] = int(p["ReturnAir"])
     # Strap-on refrigerant line probes and outdoor air, on spare ADAM-4015 channels

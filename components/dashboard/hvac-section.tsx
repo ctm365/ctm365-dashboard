@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { HvacReading, HvacUnitData, HvacUnitDef } from "@/lib/types";
+import type { HvacHealth, HvacReading, HvacUnitData, HvacUnitDef } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
+import { HvacHealthPanel } from "./hvac-health-panel";
 
 /**
  * HVAC monitoring: one card per unit with live readouts and trends.
@@ -65,6 +66,8 @@ function timeLabel(ts: number, withDate: boolean) {
 export function HvacSection({ units }: { units: HvacUnitDef[] }) {
   const [hours, setHours] = useState<number>(24);
   const [data, setData] = useState<HvacUnitData[] | null>(null);
+  /** null while loading; units without results yet are simply missing. */
+  const [health, setHealth] = useState<HvacHealth[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -80,6 +83,9 @@ export function HvacSection({ units }: { units: HvacUnitDef[] }) {
       const body = (await res.json()) as { units: HvacUnitData[] };
       setData(body.units);
       setError(null);
+      // Health is a separate, optional read: if it fails, the readings still show.
+      const h = await fetch("/api/hvac/health", { cache: "no-store" }).catch(() => null);
+      setHealth(h?.ok ? ((await h.json()) as { units: HvacHealth[] }).units : []);
     } catch {
       setError("Couldn't load HVAC readings. Retrying every minute.");
     } finally {
@@ -130,7 +136,10 @@ export function HvacSection({ units }: { units: HvacUnitDef[] }) {
 
       {units.map((def) => {
         const unit = data?.find((u) => u.id === def.id);
-        return <HvacUnitCard key={def.id} name={def.name} readings={unit?.readings ?? null} hours={hours} now={now} />;
+        const unitHealth = health === null ? null : health.find((h) => h.unitId === def.id);
+        return (
+          <HvacUnitCard key={def.id} name={def.name} readings={unit?.readings ?? null} hours={hours} now={now} health={unitHealth} />
+        );
       })}
     </section>
   );
@@ -141,11 +150,13 @@ function HvacUnitCard({
   readings,
   hours,
   now,
+  health,
 }: {
   name: string;
   readings: HvacReading[] | null;
   hours: number;
   now: number;
+  health: HvacHealth | undefined | null;
 }) {
   const rows = useMemo(() => readings ?? [], [readings]);
   const last = rows.at(-1);
@@ -195,6 +206,8 @@ function HvacUnitCard({
           {last && <span className="tabular text-muted">· {timeLabel(last.ts, true)}</span>}
         </div>
       </div>
+
+      <HvacHealthPanel health={health} />
 
       {readings == null ? (
         <p className="px-5 py-10 text-center text-sm text-muted">Loading readings…</p>
