@@ -26,6 +26,10 @@ const env = {
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const ses = new SESv2Client({});
 
+const OK_STATE = { status: "ok", streak: 0 };
+/** Alert state this container has read or written, by state key. Only this function writes the table. */
+const known = new Map();
+
 /** Customer configs, re-read at most once a minute (messages arrive every ~15 s per datacard). */
 let cache = { at: 0, items: [] };
 async function customerConfigs() {
@@ -55,8 +59,15 @@ export async function handler(event) {
     const prev = {};
     await Promise.all(
       keys.map(async (key) => {
+        // Warm invocations reuse what this container already knows; only a cold start reads the table.
+        if (known.has(key)) {
+          prev[key] = known.get(key);
+          return;
+        }
         const out = await db.send(new GetCommand({ TableName: env.stateTable, Key: { alert_key: key } }));
-        if (out.Item) prev[key] = { status: out.Item.status, streak: Number(out.Item.streak) || 0 };
+        const state = out.Item ? { status: out.Item.status, streak: Number(out.Item.streak) || 0 } : OK_STATE;
+        known.set(key, state);
+        prev[key] = state;
       }),
     );
 
@@ -86,8 +97,13 @@ export async function handler(event) {
     }
 
     // Saved after sending, so a failed send is retried on the next reading rather than lost.
+    // Only states that changed are written: "still normal" every 15 s costs nothing.
+    const changed = states.filter((s) => {
+      const before = prev[s.key] ?? OK_STATE;
+      return before.status !== s.status || before.streak !== s.streak;
+    });
     await Promise.all(
-      states.map((s) =>
+      changed.map((s) =>
         db.send(
           new PutCommand({
             TableName: env.stateTable,
@@ -104,6 +120,7 @@ export async function handler(event) {
         ),
       ),
     );
+    for (const s of changed) known.set(s.key, { status: s.status, streak: s.streak });
   }
   return { datacardId, customers: customers.length, sent };
 }

@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadConfigAndTelemetry",
+      "Effect": "Allow",
+      "Action": ["dynamodb:Scan", "dynamodb:Query", "dynamodb:GetItem"],
+      "Resource": [
+        "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_customer_config",
+        "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_hvac_telemetry"
+      ]
+    },
+    {
+      "Sid": "WriteAnalytics",
+      "Effect": "Allow",
+      "Action": ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem"],
+      "Resource": "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_hvac_analytics"
+    }
+  ]
+}

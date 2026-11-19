@@ -13,7 +13,10 @@
     {
       "Sid": "ListTables",
       "Effect": "Allow",
-      "Action": ["dynamodb:ListTables", "dynamodb:DescribeLimits"],
+      "Action": [
+        "dynamodb:ListTables",
+        "dynamodb:DescribeLimits"
+      ],
       "Resource": "*"
     },
     {
@@ -192,6 +195,28 @@
           ]
         }
       }
+    },
+    {
+      "Sid": "Ctm365Schedules",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutRule",
+        "events:PutTargets",
+        "events:DescribeRule",
+        "events:ListTargetsByRule",
+        "events:RemoveTargets",
+        "events:DeleteRule",
+        "events:EnableRule",
+        "events:DisableRule",
+        "events:TagResource"
+      ],
+      "Resource": "arn:aws:events:us-west-2:593989447113:rule/ctm365-*"
+    },
+    {
+      "Sid": "ListSchedules",
+      "Effect": "Allow",
+      "Action": "events:ListRules",
+      "Resource": "*"
     }
   ]
 }
