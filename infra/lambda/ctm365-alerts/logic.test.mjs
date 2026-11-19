@@ -85,7 +85,7 @@ test("email shows the reading in the customer's unit and escapes names", () => {
     { customer: evil, asset: customer.assets[0], sensor: customer.sensors[0], value: 26.04, ts: Date.UTC(2026, 10, 19, 20, 5), thresholds: customer.thresholds },
     { dashboardUrl: "https://dashboard.ctm365.com", timeZone: "America/Los_Angeles" },
   );
-  assert.equal(email.subject, "CRITICAL: <b>Plant</b> - MSWB / Phase A lug at 46.9 F rise");
+  assert.equal(email.subject, "CRITICAL: <b>Plant</b> - MSWB / Phase A lug");
   assert.match(email.text, /above the Critical limit of 45\.0°F/);
   assert.match(email.text, /admin\/Acme%20Foods/);
   assert.ok(!email.html.includes("<b>Plant</b>"), "HTML is escaped");
