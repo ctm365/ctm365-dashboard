@@ -99,9 +99,9 @@ export function HvacSection({ units }: { units: HvacUnitDef[] }) {
     <section aria-labelledby="hvac-heading" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 id="hvac-heading" className="font-display text-xl font-semibold text-ink">
+          <h1 id="hvac-heading" className="font-display text-xl font-semibold text-ink">
             HVAC monitoring
-          </h2>
+          </h1>
           <p className="text-sm text-muted">Updated every minute from the on-site gateway.</p>
         </div>
         <div role="group" aria-label="Time range" className="inline-flex rounded-md border border-line bg-surface p-0.5">

@@ -15,6 +15,12 @@ export async function GET(request: Request) {
   }
 
   const readings = await streamCustomerReadings(session.customerId);
+  if (!readings) {
+    return Response.json(
+      { error: "Electrical monitoring isn't enabled for this account" },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const encoder = new TextEncoder();
   let cleanup = () => {};
 

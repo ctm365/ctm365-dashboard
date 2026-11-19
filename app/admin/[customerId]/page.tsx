@@ -5,7 +5,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { ConfigEditor } from "@/components/admin/config-editor";
 import { requireAdmin } from "@/lib/auth/session";
 import { getCustomerConfig } from "@/lib/config/store";
-import { isValidCustomerId } from "@/lib/config/validation";
+import { adminCustomerPath, isValidCustomerId } from "@/lib/config/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function CustomerConfigPage({ params }: { params: Promise<{
   const { customerId } = await params;
   const valid = isValidCustomerId(customerId);
   // Auth first, so nothing about this URL is revealed to non-admins.
-  const session = await requireAdmin(valid ? `/admin/${customerId}` : "/admin");
+  const session = await requireAdmin(valid ? adminCustomerPath(customerId) : "/admin");
   if (!valid) notFound();
 
   const config = await getCustomerConfig(customerId);

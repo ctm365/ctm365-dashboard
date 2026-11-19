@@ -4,15 +4,27 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminAction } from "@/lib/auth/session";
-import { ConcurrentUpdateError, createCustomerConfig, updateCustomerConfig } from "@/lib/config/store";
+import {
+  ConcurrentUpdateError,
+  createCustomerConfig,
+  deleteCustomerConfig,
+  getCustomerConfig,
+  updateCustomerConfig,
+} from "@/lib/config/store";
 import type { CustomerConfig } from "@/lib/config/types";
 import {
+  CUSTOMER_ID_MAX_LENGTH,
   ConfigInputError,
   MAX_ASSETS,
+  MAX_HVAC_UNITS,
   MAX_SENSORS,
   parseChannel,
+  adminCustomerPath,
   parseCustomerId,
+  parseDatacardId,
+  parseHvacUnitId,
   parseName,
+  parseServices,
   parseTempUnit,
   parseThresholds,
 } from "@/lib/config/validation";
@@ -55,7 +67,7 @@ async function applyChange(
     const config = await updateCustomerConfig(customerId, change);
     if (!config) return { ok: false, error: "This customer no longer exists." };
     revalidatePath("/admin");
-    revalidatePath(`/admin/${customerId}`);
+    revalidatePath(adminCustomerPath(customerId));
     return { ok: true, config, createdId };
   } catch (err) {
     return failure(operation, err);
@@ -84,7 +96,7 @@ export async function createCustomer(_prev: CreateCustomerState, formData: FormD
   await requireAdminAction();
 
   const raw = formData.get("customerId");
-  const input = typeof raw === "string" ? raw.trim().slice(0, 64) : "";
+  const input = typeof raw === "string" ? raw.trim().slice(0, CUSTOMER_ID_MAX_LENGTH) : "";
   let customerId: string;
   try {
     customerId = parseCustomerId(input);
@@ -97,7 +109,7 @@ export async function createCustomer(_prev: CreateCustomerState, formData: FormD
   }
 
   revalidatePath("/admin");
-  redirect(`/admin/${customerId}`);
+  redirect(adminCustomerPath(customerId));
 }
 
 export async function updateSiteName(customerId: string, name: string): Promise<ConfigResult> {
@@ -127,6 +139,34 @@ export async function updateDisplaySettings(
     return applyChange("updateDisplaySettings", customerId, (c) => ({ ...c, tempUnit, thresholds }));
   } catch (err) {
     return failure("updateDisplaySettings", err);
+  }
+}
+
+/**
+ * Which services the customer sees. Turning one off only hides it: its
+ * assets, sensors and HVAC units stay, so turning it back on restores them.
+ */
+export async function updateServices(
+  customerId: string,
+  services: { electrical: boolean; hvac: boolean },
+): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    const next = parseServices(services);
+    return applyChange("updateServices", customerId, (c) => ({ ...c, services: next }));
+  } catch (err) {
+    return failure("updateServices", err);
+  }
+}
+
+/** The Exertherm datacard whose readings feed this customer's sensors. Blank disconnects it. */
+export async function updateDatacardId(customerId: string, datacardId: string): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    const id = parseDatacardId(datacardId);
+    return applyChange("updateDatacardId", customerId, (c) => ({ ...c, electricalDatacardId: id }));
+  } catch (err) {
+    return failure("updateDatacardId", err);
   }
 }
 
@@ -233,4 +273,89 @@ export async function removeSensor(customerId: string, sensorId: string): Promis
     findSensor(c, sensorId);
     return { ...c, sensors: c.sensors.filter((s) => s.id !== sensorId) };
   });
+}
+
+function findHvacUnit(config: CustomerConfig, unitId: unknown) {
+  const unit = config.hvacUnits.find((u) => u.id === unitId);
+  if (!unit) throw new ConfigInputError("That HVAC unit no longer exists. Reload the page.");
+  return unit;
+}
+
+/** The unit ID must match the end of the gateway's MQTT topic, so readings land on it. */
+export async function addHvacUnit(customerId: string, unitId: string, name: string): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    const id = parseHvacUnitId(unitId);
+    const unitName = parseName(name, "Unit name");
+    return applyChange(
+      "addHvacUnit",
+      customerId,
+      (c) => {
+        if (c.hvacUnits.length >= MAX_HVAC_UNITS) {
+          throw new ConfigInputError(`A site can have at most ${MAX_HVAC_UNITS} HVAC units.`);
+        }
+        if (c.hvacUnits.some((u) => u.id === id)) {
+          throw new ConfigInputError(`This customer already has a unit with ID "${id}".`);
+        }
+        return { ...c, hvacUnits: [...c.hvacUnits, { id, name: unitName }] };
+      },
+      id,
+    );
+  } catch (err) {
+    return failure("addHvacUnit", err);
+  }
+}
+
+export async function renameHvacUnit(customerId: string, unitId: string, name: string): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    const unitName = parseName(name, "Unit name");
+    return applyChange("renameHvacUnit", customerId, (c) => {
+      findHvacUnit(c, unitId);
+      return { ...c, hvacUnits: c.hvacUnits.map((u) => (u.id === unitId ? { ...u, name: unitName } : u)) };
+    });
+  } catch (err) {
+    return failure("renameHvacUnit", err);
+  }
+}
+
+/** Removes the unit from the dashboard. Its readings stay in ctm365_hvac_telemetry. */
+export async function removeHvacUnit(customerId: string, unitId: string): Promise<ConfigResult> {
+  await requireAdminAction();
+  return applyChange("removeHvacUnit", customerId, (c) => {
+    findHvacUnit(c, unitId);
+    return { ...c, hvacUnits: c.hvacUnits.filter((u) => u.id !== unitId) };
+  });
+}
+
+export interface DeleteCustomerState {
+  error?: string;
+}
+
+/**
+ * Deletes the customer's dashboard setup (site name, services, assets,
+ * sensors, HVAC units). Readings in the telemetry tables and the customer's
+ * sign-in accounts are not touched. The admin must type the exact ID to confirm.
+ */
+export async function deleteCustomer(
+  customerId: string,
+  _prev: DeleteCustomerState,
+  formData: FormData,
+): Promise<DeleteCustomerState> {
+  await requireAdminAction();
+  try {
+    const id = parseCustomerId(customerId);
+    const typed = formData.get("confirm");
+    if (typed !== id) {
+      return { error: "The ID you typed doesn't match. Type it exactly, including capital letters and spaces." };
+    }
+    if (!(await getCustomerConfig(id))) return { error: "This customer no longer exists." };
+    await deleteCustomerConfig(id);
+    console.info(`[admin] deleted customer config ${JSON.stringify(id)}`);
+  } catch (err) {
+    const result = failure("deleteCustomer", err);
+    return { error: result.ok ? undefined : result.error };
+  }
+  revalidatePath("/admin");
+  redirect("/admin?deleted=1");
 }

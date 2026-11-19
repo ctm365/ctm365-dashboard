@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "iot:Connect",
+      "Resource": "arn:aws:iot:us-west-2:593989447113:client/ctm365-gt200-mqie-electrical-01"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iot:Publish",
+      "Resource": [
+        "arn:aws:iot:us-west-2:593989447113:topic/ctm365/acme-corp/plant-01/gt200-0042/temperature",
+        "arn:aws:iot:us-west-2:593989447113:topic/ctm365/*/electrical/*"
+      ]
+    }
+  ]
+}

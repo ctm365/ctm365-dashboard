@@ -16,6 +16,12 @@ export interface AssetDef {
 /** Unit the customer's dashboard shows temperature rise in. Readings are always stored in Celsius. */
 export type TempUnit = "F" | "C";
 
+/** The monitoring services CTM365 offers. A customer can have either or both. */
+export type ServiceId = "electrical" | "hvac";
+
+/** Which services a customer has. A service that is off is hidden from them entirely. */
+export type Services = Record<ServiceId, boolean>;
+
 export interface HvacUnitDef {
   /** hvac_unit_id in ctm365_hvac_telemetry. */
   id: string;
@@ -31,6 +37,9 @@ export interface SiteDef {
   unit: TempUnit;
   thresholds: Thresholds;
   hvacUnits: HvacUnitDef[];
+  services: Services;
+  /** Exertherm datacard whose readings feed the electrical sensors, or null if none is connected yet. */
+  electricalDatacardId: string | null;
 }
 
 /**

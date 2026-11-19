@@ -17,6 +17,9 @@ export async function GET(request: Request) {
   const hours = Number(new URL(request.url).searchParams.get("hours") ?? "24");
   try {
     const units = await getHvacData(session.customerId, Number.isFinite(hours) ? hours : 24);
+    if (!units) {
+      return Response.json({ error: "HVAC monitoring isn't enabled for this account" }, { status: 403, headers: NO_STORE });
+    }
     return Response.json({ units }, { headers: NO_STORE });
   } catch (err) {
     const name = err instanceof Error ? err.name : "UnknownError";

@@ -1,0 +1,14 @@
+{
+  "sql": "SELECT *, topic(4) AS sensor_id, topic(2) AS site_id, concat('', timestamp()) AS timestamp FROM 'ctm365/+/electrical/+'",
+  "description": "Electrical gateways publish to ctm365/<site>/electrical/<datacard-id>. One item per message in ctm365_telemetry, keyed by the datacard ID; channel N is properties.SensorN x 0.1 = deg C rise.",
+  "awsIotSqlVersion": "2016-03-23",
+  "ruleDisabled": false,
+  "actions": [
+    {
+      "dynamoDBv2": {
+        "roleArn": "arn:aws:iam::593989447113:role/CTM365-IoT-DynamoDB-Role",
+        "putItem": { "tableName": "ctm365_telemetry" }
+      }
+    }
+  ]
+}

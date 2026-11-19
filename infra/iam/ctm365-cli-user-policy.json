@@ -1,0 +1,197 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Ctm365Tables",
+      "Effect": "Allow",
+      "Action": "dynamodb:*",
+      "Resource": [
+        "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_*",
+        "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_*/*"
+      ]
+    },
+    {
+      "Sid": "ListTables",
+      "Effect": "Allow",
+      "Action": ["dynamodb:ListTables", "dynamodb:DescribeLimits"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ctm365Lambdas",
+      "Effect": "Allow",
+      "Action": "lambda:*",
+      "Resource": [
+        "arn:aws:lambda:us-west-2:593989447113:function:ctm365-*",
+        "arn:aws:lambda:us-west-2:593989447113:function:ctm365_*"
+      ]
+    },
+    {
+      "Sid": "LambdaListAndLogs",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:ListFunctions",
+        "lambda:GetAccountSettings",
+        "logs:Describe*",
+        "logs:Get*",
+        "logs:FilterLogEvents",
+        "logs:StartQuery",
+        "logs:GetQueryResults",
+        "logs:CreateLogGroup",
+        "logs:PutRetentionPolicy"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IotRulesAndPolicies",
+      "Effect": "Allow",
+      "Action": [
+        "iot:ListTopicRules",
+        "iot:GetTopicRule",
+        "iot:CreateTopicRule",
+        "iot:ReplaceTopicRule",
+        "iot:ListPolicies",
+        "iot:GetPolicy",
+        "iot:GetPolicyVersion",
+        "iot:ListPolicyVersions",
+        "iot:CreatePolicyVersion",
+        "iot:ListThings",
+        "iot:DescribeThing",
+        "iot:DescribeEndpoint"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CustomerUsers",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:Describe*",
+        "cognito-idp:List*",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:AdminAddUserToGroup",
+        "cognito-idp:AdminRemoveUserFromGroup",
+        "cognito-idp:AdminListGroupsForUser",
+        "cognito-idp:AdminDisableUser",
+        "cognito-idp:AdminEnableUser",
+        "cognito-idp:AdminResetUserPassword"
+      ],
+      "Resource": "arn:aws:cognito-idp:us-west-2:593989447113:userpool/us-west-2_FP9dLmuKn"
+    },
+    {
+      "Sid": "AlertEmail",
+      "Effect": "Allow",
+      "Action": [
+        "ses:Get*",
+        "ses:List*",
+        "ses:CreateEmailIdentity",
+        "ses:PutEmailIdentityDkimSigningAttributes",
+        "ses:PutEmailIdentityMailFromAttributes",
+        "ses:PutAccountDetails",
+        "ses:SendEmail"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ctm365Topics",
+      "Effect": "Allow",
+      "Action": "sns:*",
+      "Resource": "arn:aws:sns:*:593989447113:ctm365-*"
+    },
+    {
+      "Sid": "SnsList",
+      "Effect": "Allow",
+      "Action": [
+        "sns:ListTopics",
+        "sns:GetSMSAttributes",
+        "sns:GetSMSSandboxAccountStatus",
+        "sns:ListOriginationNumbers"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "UptimeMonitoring",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:ListMetrics",
+        "route53:CreateHealthCheck",
+        "route53:GetHealthCheck",
+        "route53:GetHealthCheckStatus",
+        "route53:ListHealthChecks",
+        "route53:UpdateHealthCheck",
+        "route53:ChangeTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ec2ReadOnly",
+      "Effect": "Allow",
+      "Action": "ec2:Describe*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DashboardFirewall",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:ModifySecurityGroupRules"
+      ],
+      "Resource": "arn:aws:ec2:us-west-2:593989447113:security-group/sg-0921a5daed990c6ee"
+    },
+    {
+      "Sid": "DeployWithoutSshKeys",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": [
+        "arn:aws:ec2:us-west-2:593989447113:instance/i-042e3e21e1d5d4422",
+        "arn:aws:ssm:us-west-2::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "DeployStatus",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommands",
+        "ssm:ListCommandInvocations",
+        "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ctm365Roles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:PassRole",
+        "iam:CreateRole",
+        "iam:TagRole",
+        "iam:ListRolePolicies",
+        "iam:GetRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": "arn:aws:iam::593989447113:role/ctm365-*"
+    },
+    {
+      "Sid": "AttachOnlyTheseManagedPolicies",
+      "Effect": "Allow",
+      "Action": "iam:AttachRolePolicy",
+      "Resource": "arn:aws:iam::593989447113:role/ctm365-*",
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": [
+            "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          ]
+        }
+      }
+    }
+  ]
+}

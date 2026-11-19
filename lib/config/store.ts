@@ -3,7 +3,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { DEFAULT_TEMP_UNIT, DEFAULT_THRESHOLDS } from "../fleet";
 import type { AssetConfig, CustomerConfig, HvacUnitConfig, SensorConfig } from "./types";
-import { isTempUnit, normalizeThresholds } from "./validation";
+import { isTempUnit, normalizeDatacardId, normalizeServices, normalizeThresholds } from "./validation";
 
 /**
  * Per-customer dashboard labels in DynamoDB. One item per customer:
@@ -66,6 +66,11 @@ function fromItem(item: Record<string, unknown>): CustomerConfig {
     tempUnit: isTempUnit(item.tempUnit) ? item.tempUnit : DEFAULT_TEMP_UNIT,
     thresholds: normalizeThresholds(item.thresholds, DEFAULT_THRESHOLDS),
     hvacUnits,
+    services: normalizeServices(item.services, {
+      hasElectricalSetup: assets.length > 0 || sensors.length > 0,
+      hasHvacSetup: hvacUnits.length > 0,
+    }),
+    electricalDatacardId: normalizeDatacardId(item.electricalDatacardId),
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
   };
 }
@@ -79,6 +84,8 @@ function toItem(config: CustomerConfig) {
     tempUnit: config.tempUnit,
     thresholds: config.thresholds,
     hvacUnits: config.hvacUnits,
+    services: config.services,
+    electricalDatacardId: config.electricalDatacardId,
     updatedAt: config.updatedAt,
   };
 }
@@ -128,6 +135,9 @@ export async function createCustomerConfig(customerId: string): Promise<boolean>
           tempUnit: DEFAULT_TEMP_UNIT,
           thresholds: DEFAULT_THRESHOLDS,
           hvacUnits: [],
+          // A new customer starts with nothing on; the admin turns on what they bought.
+          services: { electrical: false, hvac: false },
+          electricalDatacardId: null,
           updatedAt: new Date().toISOString(),
         }),
         ConditionExpression: "attribute_not_exists(customer_id)",

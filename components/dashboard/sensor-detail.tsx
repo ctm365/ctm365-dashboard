@@ -11,6 +11,13 @@ import { cn } from "@/components/ui/cn";
 const EDGE = { normal: "border-t-ok", watch: "border-t-watch", critical: "border-t-critical" } as const;
 import { formatLimit, formatRise, formatTime } from "./format";
 
+/** "Last 42 minutes." from the readings actually shown (they arrive about every 15 s). */
+function spanLabel(data: { ts: number }[]) {
+  if (data.length < 2) return "";
+  const minutes = Math.max(1, Math.round((data[data.length - 1].ts - data[0].ts) / 60_000));
+  return `Last ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}
+
 export function SensorDetail() {
   const { selected, site } = useLiveFleet();
   const { unit, thresholds } = site;
@@ -136,7 +143,7 @@ export function SensorDetail() {
         </dl>
       )}
       <p className="px-5 pb-4 text-xs text-muted">
-        Last {Math.round((data.length * 2) / 60)} minutes. Watch at {formatLimit(thresholds.watchC, unit)}°{unit} rise,
+        {spanLabel(data)} Watch at {formatLimit(thresholds.watchC, unit)}°{unit} rise,
         critical at {formatLimit(thresholds.criticalC, unit)}°{unit}.
       </p>
     </Card>

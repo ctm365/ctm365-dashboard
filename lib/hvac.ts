@@ -1,6 +1,7 @@
 import "server-only";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { HVAC_UNIT_ID_PATTERN } from "./config/validation";
 import { getCustomerSite } from "./telemetry";
 import type { HvacReading, HvacUnitData } from "./types";
 
@@ -18,7 +19,6 @@ const TABLE_NAME = "ctm365_hvac_telemetry";
 const REGION = "us-west-2";
 /** Hard cap on how far back the dashboard reads, in hours. */
 export const HVAC_MAX_HOURS = 168;
-const UNIT_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
 let client: DynamoDBDocumentClient | undefined;
 
@@ -77,10 +77,12 @@ async function queryUnit(unitId: string, sinceIso: string): Promise<HvacReading[
   return readings;
 }
 
-export async function getHvacData(customerId: string, hours: number): Promise<HvacUnitData[]> {
+/** Returns null when the customer doesn't have the HVAC service. */
+export async function getHvacData(customerId: string, hours: number): Promise<HvacUnitData[] | null> {
   const site = await getCustomerSite(customerId);
+  if (!site.services.hvac) return null;
   const span = Math.min(Math.max(1, Math.round(hours)), HVAC_MAX_HOURS);
   const since = new Date(Date.now() - span * 3600_000).toISOString().slice(0, 17) + "00Z";
-  const units = site.hvacUnits.filter((u) => UNIT_ID_PATTERN.test(u.id));
+  const units = site.hvacUnits.filter((u) => HVAC_UNIT_ID_PATTERN.test(u.id));
   return Promise.all(units.map(async (u) => ({ id: u.id, name: u.name, readings: await queryUnit(u.id, since) })));
 }

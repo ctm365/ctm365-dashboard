@@ -1,0 +1,18 @@
+{
+    "ruleName": "CTM365_TemperatureToDynamoDB",
+    "sql": "SELECT *, 'exertherm-07' AS sensor_id, properties.Sensor1 * 0.1 AS temperature_rise_c, concat('', timestamp()) AS timestamp FROM 'ctm365/+/+/+/temperature'",
+    "description": "Routes Exertherm temperature readings to DynamoDB",
+    "createdAt": "2026-08-17T01:09:25-07:00",
+    "actions": [
+        {
+            "dynamoDBv2": {
+                "roleArn": "arn:aws:iam::593989447113:role/CTM365-IoT-DynamoDB-Role",
+                "putItem": {
+                    "tableName": "ctm365_telemetry"
+                }
+            }
+        }
+    ],
+    "ruleDisabled": false,
+    "awsIotSqlVersion": "2016-03-23"
+}

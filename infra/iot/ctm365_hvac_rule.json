@@ -1,0 +1,14 @@
+{
+    "ruleName": "ctm365_hvac_rule",
+    "sql": "SELECT *, topic(2) AS site_id, topic(4) AS unit_id, timestamp() AS received_ms FROM 'ctm365/+/hvac/+'",
+    "createdAt": "2026-11-18T23:14:43-08:00",
+    "actions": [
+        {
+            "lambda": {
+                "functionArn": "arn:aws:lambda:us-west-2:593989447113:function:ctm365-hvac-ingest"
+            }
+        }
+    ],
+    "ruleDisabled": false,
+    "awsIotSqlVersion": "2016-03-23"
+}

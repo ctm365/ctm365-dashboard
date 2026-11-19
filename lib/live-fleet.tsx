@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
-import { HISTORY_LIMIT, statusFor } from "./fleet";
+import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { HISTORY_LIMIT, STALE_AFTER_MS, statusFor } from "./fleet";
 import type { Reading, SiteDef, Status } from "./types";
 
 export type ConnectionState = "connecting" | "live" | "reconnecting";
@@ -45,7 +45,8 @@ function reducer(state: State, action: Action): State {
         ...state,
         history: append({}, action.readings),
         connection: "live",
-        lastUpdate: action.readings.at(-1)?.ts ?? Date.now(),
+        // null when there are no readings yet, so the page doesn't claim a fresh update.
+        lastUpdate: action.readings.at(-1)?.ts ?? null,
       };
     case "readings":
       return {
@@ -68,6 +69,11 @@ interface LiveFleet {
   select: (id: string) => void;
   connection: ConnectionState;
   lastUpdate: number | null;
+  /**
+   * True when there is no reading yet, or none for STALE_AFTER_MS. The page
+   * must not present old colors as the current condition while this is set.
+   */
+  stale: boolean;
 }
 
 const LiveFleetContext = createContext<LiveFleet | null>(null);
@@ -81,6 +87,12 @@ export function LiveFleetProvider({ site, children }: { site: SiteDef; children:
     lastUpdate: null,
     selectedId: null,
   });
+  // Re-checked every 15 s so "stale" turns on even when no new readings arrive.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const source = new EventSource("/api/stream");
@@ -126,8 +138,9 @@ export function LiveFleetProvider({ site, children }: { site: SiteDef; children:
       select: (id) => dispatch({ type: "select", id }),
       connection: state.connection,
       lastUpdate: state.lastUpdate,
+      stale: state.lastUpdate === null || now - state.lastUpdate > STALE_AFTER_MS,
     };
-  }, [site, state]);
+  }, [site, state, now]);
 
   return <LiveFleetContext.Provider value={value}>{children}</LiveFleetContext.Provider>;
 }

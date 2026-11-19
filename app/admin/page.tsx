@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { listCustomerConfigs } from "@/lib/config/store";
 import type { CustomerConfig } from "@/lib/config/types";
+import { adminCustomerPath } from "@/lib/config/validation";
+import { enabledServices } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +17,17 @@ export const metadata: Metadata = {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-export default async function AdminPage() {
+/** e.g. "Electrical: 5 sensors · HVAC: 1 unit", or "No services on". */
+function summary(c: CustomerConfig) {
+  const parts = enabledServices(c.services).map((s) =>
+    s.id === "electrical" ? `Electrical: ${plural(c.sensors.length, "sensor")}` : `HVAC: ${plural(c.hvacUnits.length, "unit")}`,
+  );
+  return parts.length > 0 ? parts.join(" · ") : "No services on";
+}
+
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   const session = await requireAdmin("/admin");
+  const { deleted } = await searchParams;
 
   let customers: CustomerConfig[] | null = null;
   try {
@@ -28,6 +39,11 @@ export default async function AdminPage() {
   return (
     <AdminShell email={session.email}>
       <div className="flex flex-col gap-6">
+        {deleted === "1" && (
+          <p role="status" className="rounded-md bg-sunken px-3 py-2 text-sm text-ink">
+            Customer deleted. It can be restored from backup for 35 days.
+          </p>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>
@@ -50,16 +66,14 @@ export default async function AdminPage() {
               {customers.map((c) => (
                 <li key={c.customerId}>
                   <Link
-                    href={`/admin/${c.customerId}`}
+                    href={adminCustomerPath(c.customerId)}
                     className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 py-3 hover:bg-sunken"
                   >
                     <span className="flex min-w-0 flex-col">
                       <span className="font-medium text-ink">{c.siteName || "Unnamed site"}</span>
                       <span className="tabular text-xs text-muted">{c.customerId}</span>
                     </span>
-                    <span className="text-xs text-muted">
-                      {plural(c.assets.length, "asset")} · {plural(c.sensors.length, "sensor")}
-                    </span>
+                    <span className="text-xs text-muted">{summary(c)}</span>
                   </Link>
                 </li>
               ))}

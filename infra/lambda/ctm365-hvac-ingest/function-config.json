@@ -1,0 +1,17 @@
+{
+    "runtime": "python3.12",
+    "handler": "lambda_function.lambda_handler",
+    "role": "arn:aws:iam::593989447113:role/CTM365-HVAC-Ingest-Lambda-Role",
+    "timeout": 10,
+    "memory": 128,
+    "env": {
+        "TABLE": "ctm365_hvac_telemetry",
+        "POWER_SCALE": "10",
+        "CT_AMPS": "100",
+        "CURRENT_INT_SCALE": "20000"
+    },
+    "arch": [
+        "x86_64"
+    ],
+    "modified": "2026-11-19T07:14:33.205+0000"
+}

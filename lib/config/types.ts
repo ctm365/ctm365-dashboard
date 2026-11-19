@@ -1,4 +1,4 @@
-import type { TempUnit, Thresholds } from "../types";
+import type { Services, TempUnit, Thresholds } from "../types";
 
 export interface AssetConfig {
   id: string;
@@ -29,5 +29,13 @@ export interface CustomerConfig {
   /** Watch/critical boundaries (Celsius rise) applied to every sensor. */
   thresholds: Thresholds;
   hvacUnits: HvacUnitConfig[];
+  /** Which services the customer sees. Set on /admin; a service that is off keeps its setup. */
+  services: Services;
+  /**
+   * The Exertherm datacard feeding this customer's electrical sensors: the
+   * last part of its gateway's topic, ctm365/<site>/electrical/<datacard-id>.
+   * null until one is connected. Sensor channels 1-8 map to its Sensor1-8.
+   */
+  electricalDatacardId: string | null;
   updatedAt: string;
 }
