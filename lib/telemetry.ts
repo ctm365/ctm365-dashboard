@@ -33,6 +33,7 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
       sensors: [],
       unit: DEFAULT_TEMP_UNIT,
       thresholds: DEFAULT_THRESHOLDS,
+      hvacUnits: [],
     };
   }
 
@@ -45,6 +46,7 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
     sensors: config.sensors.filter((s) => assetIds.has(s.assetId)),
     unit: config.tempUnit,
     thresholds: config.thresholds,
+    hvacUnits: config.hvacUnits,
   };
 }
 

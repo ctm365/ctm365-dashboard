@@ -16,6 +16,12 @@ export interface AssetDef {
 /** Unit the customer's dashboard shows temperature rise in. Readings are always stored in Celsius. */
 export type TempUnit = "F" | "C";
 
+export interface HvacUnitDef {
+  /** hvac_unit_id in ctm365_hvac_telemetry. */
+  id: string;
+  name: string;
+}
+
 export interface SiteDef {
   id: string;
   name: string;
@@ -24,6 +30,38 @@ export interface SiteDef {
   /** Set per customer on /admin. */
   unit: TempUnit;
   thresholds: Thresholds;
+  hvacUnits: HvacUnitDef[];
+}
+
+/**
+ * One minute of HVAC readings from ctm365_hvac_telemetry (already converted
+ * to engineering units by the ctm365-hvac-ingest Lambda). Any field can be
+ * missing when a device didn't answer that minute.
+ */
+export interface HvacReading {
+  /** Start of the minute, epoch milliseconds. */
+  ts: number;
+  supplyF?: number;
+  returnF?: number;
+  staticInwc?: number;
+  voltageV?: number;
+  voltageAnV?: number;
+  voltageAbV?: number;
+  currentA?: number;
+  currentAA?: number;
+  currentBA?: number;
+  currentCA?: number;
+  powerW?: number;
+  powerFactor?: number;
+  frequencyHz?: number;
+  energyKwh?: number;
+}
+
+export interface HvacUnitData {
+  id: string;
+  name: string;
+  /** Oldest first. */
+  readings: HvacReading[];
 }
 
 /** One reading. Stored in Celsius, matching temperature_rise_c in DynamoDB. */

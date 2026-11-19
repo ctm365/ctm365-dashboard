@@ -13,6 +13,12 @@ export interface SensorConfig {
   channel: number;
 }
 
+/** One monitored HVAC unit. id matches hvac_unit_id in ctm365_hvac_telemetry (the gateway's MQTT topic). */
+export interface HvacUnitConfig {
+  id: string;
+  name: string;
+}
+
 export interface CustomerConfig {
   customerId: string;
   siteName: string;
@@ -22,5 +28,6 @@ export interface CustomerConfig {
   tempUnit: TempUnit;
   /** Watch/critical boundaries (Celsius rise) applied to every sensor. */
   thresholds: Thresholds;
+  hvacUnits: HvacUnitConfig[];
   updatedAt: string;
 }

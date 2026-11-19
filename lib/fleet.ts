@@ -32,6 +32,7 @@ export const DEMO_SITE: SiteDef = {
   ],
   unit: DEFAULT_TEMP_UNIT,
   thresholds: DEFAULT_THRESHOLDS,
+  hvacUnits: [],
 };
 
 /**

@@ -2,7 +2,7 @@ import "server-only";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { DEFAULT_TEMP_UNIT, DEFAULT_THRESHOLDS } from "../fleet";
-import type { AssetConfig, CustomerConfig, SensorConfig } from "./types";
+import type { AssetConfig, CustomerConfig, HvacUnitConfig, SensorConfig } from "./types";
 import { isTempUnit, normalizeThresholds } from "./validation";
 
 /**
@@ -52,6 +52,11 @@ function fromItem(item: Record<string, unknown>): CustomerConfig {
         )
         .map(({ id, name, assetId, channel }) => ({ id, name, assetId, channel }))
     : [];
+  const hvacUnits: HvacUnitConfig[] = Array.isArray(item.hvacUnits)
+    ? item.hvacUnits
+        .filter((u): u is HvacUnitConfig => typeof u?.id === "string" && typeof u?.name === "string")
+        .map(({ id, name }) => ({ id, name }))
+    : [];
   return {
     customerId: String(item.customer_id),
     siteName: typeof item.siteName === "string" ? item.siteName : "",
@@ -60,6 +65,7 @@ function fromItem(item: Record<string, unknown>): CustomerConfig {
     // Items saved before these settings existed have neither field.
     tempUnit: isTempUnit(item.tempUnit) ? item.tempUnit : DEFAULT_TEMP_UNIT,
     thresholds: normalizeThresholds(item.thresholds, DEFAULT_THRESHOLDS),
+    hvacUnits,
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
   };
 }
@@ -72,6 +78,7 @@ function toItem(config: CustomerConfig) {
     sensors: config.sensors,
     tempUnit: config.tempUnit,
     thresholds: config.thresholds,
+    hvacUnits: config.hvacUnits,
     updatedAt: config.updatedAt,
   };
 }
@@ -120,6 +127,7 @@ export async function createCustomerConfig(customerId: string): Promise<boolean>
           sensors: [],
           tempUnit: DEFAULT_TEMP_UNIT,
           thresholds: DEFAULT_THRESHOLDS,
+          hvacUnits: [],
           updatedAt: new Date().toISOString(),
         }),
         ConditionExpression: "attribute_not_exists(customer_id)",
