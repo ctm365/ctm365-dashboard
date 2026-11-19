@@ -11,7 +11,7 @@ import { SensorDetail } from "./sensor-detail";
 export function ElectricalDashboard() {
   const { site } = useLiveFleet();
 
-  if (!site.electricalDatacardId) {
+  if (!site.electricalDatacardId && !site.electricalSampleData) {
     return (
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6">
         <EmptyState title="Your monitoring equipment isn't connected yet">

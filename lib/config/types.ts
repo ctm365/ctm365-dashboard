@@ -37,5 +37,7 @@ export interface CustomerConfig {
    * null until one is connected. Sensor channels 1-8 map to its Sensor1-8.
    */
   electricalDatacardId: string | null;
+  /** Electrical page shows the fixed sample scenario instead of live readings, for demos. Off by default. */
+  electricalSampleData: boolean;
   updatedAt: string;
 }

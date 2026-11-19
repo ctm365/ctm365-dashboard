@@ -2,6 +2,7 @@ import "server-only";
 import { getCustomerConfig } from "./config/store";
 import { samplesToReadings } from "./datacard";
 import { getDatacardSamples } from "./electrical";
+import { SAMPLE_INTERVAL_MS, sampleHistory, sampleTick } from "./sample-data";
 import { DEFAULT_TEMP_UNIT, DEFAULT_THRESHOLDS, ELECTRICAL_POLL_MS, HISTORY_WINDOW_MS } from "./fleet";
 import { NO_SERVICES } from "./services";
 import type { Reading, SiteDef } from "./types";
@@ -38,6 +39,7 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
       hvacUnits: [],
       services: NO_SERVICES,
       electricalDatacardId: null,
+      electricalSampleData: false,
     };
   }
 
@@ -53,12 +55,29 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
     hvacUnits: config.hvacUnits,
     services: config.services,
     electricalDatacardId: config.electricalDatacardId,
+    electricalSampleData: config.electricalSampleData,
   };
 }
 
 export interface ReadingStream {
   history: Reading[];
   subscribe(onReadings: (readings: Reading[]) => void): () => void;
+}
+
+/** The fixed demo scenario, with a new point every 15 s so the page looks live. */
+function sampleStream(site: SiteDef): ReadingStream {
+  const startedAt = Math.floor(Date.now() / SAMPLE_INTERVAL_MS) * SAMPLE_INTERVAL_MS;
+  return {
+    history: sampleHistory(site.sensors, site.thresholds, startedAt),
+    subscribe(onReadings) {
+      let next = startedAt + SAMPLE_INTERVAL_MS;
+      const timer = setInterval(() => {
+        onReadings(sampleTick(site.sensors, site.thresholds, next, startedAt));
+        next += SAMPLE_INTERVAL_MS;
+      }, SAMPLE_INTERVAL_MS);
+      return () => clearInterval(timer);
+    },
+  };
 }
 
 const NO_READINGS: ReadingStream = { history: [], subscribe: () => () => {} };
@@ -71,6 +90,7 @@ const NO_READINGS: ReadingStream = { history: [], subscribe: () => () => {} };
 export async function streamCustomerReadings(customerId: string): Promise<ReadingStream | null> {
   const site = await getCustomerSite(customerId);
   if (!site.services.electrical) return null;
+  if (site.electricalSampleData) return sampleStream(site);
   const datacardId = site.electricalDatacardId;
   if (!datacardId || site.sensors.length === 0) return NO_READINGS;
 

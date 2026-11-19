@@ -71,6 +71,7 @@ function fromItem(item: Record<string, unknown>): CustomerConfig {
       hasHvacSetup: hvacUnits.length > 0,
     }),
     electricalDatacardId: normalizeDatacardId(item.electricalDatacardId),
+    electricalSampleData: item.electricalSampleData === true,
     updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : "",
   };
 }
@@ -86,6 +87,7 @@ function toItem(config: CustomerConfig) {
     hvacUnits: config.hvacUnits,
     services: config.services,
     electricalDatacardId: config.electricalDatacardId,
+    electricalSampleData: config.electricalSampleData,
     updatedAt: config.updatedAt,
   };
 }
@@ -138,6 +140,7 @@ export async function createCustomerConfig(customerId: string): Promise<boolean>
           // A new customer starts with nothing on; the admin turns on what they bought.
           services: { electrical: false, hvac: false },
           electricalDatacardId: null,
+          electricalSampleData: false,
           updatedAt: new Date().toISOString(),
         }),
         ConditionExpression: "attribute_not_exists(customer_id)",

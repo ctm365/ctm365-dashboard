@@ -32,7 +32,7 @@ export default async function CustomerConfigPage({ params }: { params: Promise<{
         / <span className="tabular text-ink">{customerId}</span>
       </nav>
       {/* key resets editor state if the admin navigates between customers. */}
-      <ConfigEditor key={customerId} initialConfig={config} />
+      <ConfigEditor key={customerId} initialConfig={config} currentUserSub={session.sub} />
     </AdminShell>
   );
 }

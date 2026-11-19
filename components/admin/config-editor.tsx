@@ -11,6 +11,7 @@ import {
   setSensorChannel,
   updateDatacardId,
   updateDisplaySettings,
+  updateSampleData,
   updateServices,
   updateSiteName,
   type ConfigResult,
@@ -25,7 +26,9 @@ import { DeleteCustomer } from "./delete-customer";
 import { DisplaySettings } from "./display-settings";
 import { EditableText } from "./editable-text";
 import { HvacUnitsEditor } from "./hvac-units-editor";
+import { SampleDataSetting } from "./sample-data-setting";
 import { ServicesSettings } from "./services-settings";
+import { UsersCard } from "./users-card";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -52,7 +55,7 @@ function formatUpdated(iso: string) {
   return Number.isNaN(date.getTime()) ? "never" : date.toLocaleString();
 }
 
-export function ConfigEditor({ initialConfig }: { initialConfig: CustomerConfig }) {
+export function ConfigEditor({ initialConfig, currentUserSub }: { initialConfig: CustomerConfig; currentUserSub: string }) {
   const [config, setConfig] = useState(initialConfig);
   /** Newly added item whose name opens in edit mode. */
   const [newItemId, setNewItemId] = useState<string>();
@@ -139,6 +142,11 @@ export function ConfigEditor({ initialConfig }: { initialConfig: CustomerConfig 
         />
       ) : (
         <>
+          <SampleDataSetting
+            on={config.electricalSampleData}
+            onSave={(next) => save(() => updateSampleData(customerId, next))}
+          />
+
           <DatacardSetting
             datacardId={config.electricalDatacardId}
             onSave={(next) => save(() => updateDatacardId(customerId, next))}
@@ -248,6 +256,9 @@ export function ConfigEditor({ initialConfig }: { initialConfig: CustomerConfig 
       ) : (
         <HvacUnitsEditor config={config} onSaved={setConfig} />
       )}
+
+      <h2 className="-mb-2 mt-2 font-display text-lg font-semibold text-ink">Users</h2>
+      <UsersCard customerId={customerId} currentUserSub={currentUserSub} />
 
       <h2 className="-mb-2 mt-2 font-display text-lg font-semibold text-ink">Danger zone</h2>
       <DeleteCustomer customerId={customerId} />

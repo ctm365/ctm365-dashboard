@@ -40,6 +40,8 @@ export interface SiteDef {
   services: Services;
   /** Exertherm datacard whose readings feed the electrical sensors, or null if none is connected yet. */
   electricalDatacardId: string | null;
+  /** Show the fixed sample scenario on the Electrical page instead of live readings (for demos). */
+  electricalSampleData: boolean;
 }
 
 /**

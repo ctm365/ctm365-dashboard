@@ -11,6 +11,7 @@ import {
   normalizeThresholds,
   parseCustomerId,
   parseDatacardId,
+  parseEmail,
   parseHvacUnitId,
   parseServices,
   parseTempUnit,
@@ -133,4 +134,11 @@ test("parseDatacardId accepts topic-safe IDs, clears on blank, and rejects the r
   for (const bad of ["exertherm 07", "a/b", "x".repeat(65)]) assert.throws(() => parseDatacardId(bad), ConfigInputError);
   assert.equal(normalizeDatacardId("exertherm-07"), "exertherm-07");
   for (const v of [undefined, null, "", "bad id", 7]) assert.equal(normalizeDatacardId(v), null);
+});
+
+test("parseEmail trims, lower-cases, and rejects malformed addresses", () => {
+  assert.equal(parseEmail("  Pat.Lee@Example.COM "), "pat.lee@example.com");
+  for (const bad of ["", "pat", "pat@", "@example.com", "pat@example", "pat lee@example.com", `${"a".repeat(250)}@x.com`, null]) {
+    assert.throws(() => parseEmail(bad), ConfigInputError);
+  }
 });

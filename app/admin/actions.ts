@@ -159,6 +159,17 @@ export async function updateServices(
   }
 }
 
+/** Shows the fixed sample scenario on this customer's Electrical page instead of live readings. */
+export async function updateSampleData(customerId: string, on: boolean): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    if (typeof on !== "boolean") throw new ConfigInputError("Choose on or off.");
+    return applyChange("updateSampleData", customerId, (c) => ({ ...c, electricalSampleData: on }));
+  } catch (err) {
+    return failure("updateSampleData", err);
+  }
+}
+
 /** The Exertherm datacard whose readings feed this customer's sensors. Blank disconnects it. */
 export async function updateDatacardId(customerId: string, datacardId: string): Promise<ConfigResult> {
   await requireAdminAction();

@@ -85,6 +85,16 @@ export function parseHvacUnitId(value: unknown): string {
   return id;
 }
 
+/** A plain check that catches typos; Cognito's own email delivery is the real test. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Trims and lower-cases, so the same person can't get two accounts by capitalization. */
+export function parseEmail(value: unknown): string {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (email.length > 254 || !EMAIL_PATTERN.test(email)) throw new ConfigInputError("Enter a valid email address.");
+  return email;
+}
+
 /** Trims and caps a label; rejects blanks. */
 export function parseName(value: unknown, what = "Name"): string {
   const name = typeof value === "string" ? value.trim().slice(0, NAME_MAX_LENGTH) : "";

@@ -13,9 +13,17 @@ const CONNECTION_TEXT: Record<ConnectionState, string> = {
 
 /** Live-stream state for the Electrical page header. */
 export function ConnectionStatus() {
-  const { connection, lastUpdate, stale } = useLiveFleet();
+  const { connection, lastUpdate, stale, site } = useLiveFleet();
   // The stream can be connected while the datacard has gone quiet.
   const quiet = connection === "live" && stale;
+  if (site.electricalSampleData) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted" title="This page is showing sample data for demonstration, not live readings.">
+        <span aria-hidden className="size-2 rounded-full bg-brand" />
+        <span>Sample data</span>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-2 text-sm text-muted" aria-live="polite">
       <span
