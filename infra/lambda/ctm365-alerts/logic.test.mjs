@@ -91,3 +91,14 @@ test("email shows the reading in the customer's unit and escapes names", () => {
   assert.ok(!email.html.includes("<b>Plant</b>"), "HTML is escaped");
   assert.match(email.html, /&lt;b&gt;Plant&lt;\/b&gt;/);
 });
+
+test("HTML email declares UTF-8 and writes the degree sign as an entity", () => {
+  const email = buildEmail(
+    { customer, asset: customer.assets[0], sensor: customer.sensors[0], value: 26, ts: Date.UTC(2026, 10, 19), thresholds: customer.thresholds },
+    { dashboardUrl: "https://dashboard.ctm365.com", timeZone: "America/Los_Angeles" },
+  );
+  assert.match(email.html, /<meta charset="utf-8">/);
+  assert.ok(!/[^\x00-\x7f]/.test(email.html), "HTML is plain ASCII");
+  assert.match(email.html, /46\.8&#176;F/);
+  assert.match(email.text, /46\.8°F/, "plain-text part keeps the real character");
+});
