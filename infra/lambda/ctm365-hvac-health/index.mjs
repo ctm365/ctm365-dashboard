@@ -1,6 +1,14 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { buildBaseline, dayMetrics, findings, health, RULES, toRow } from "./analytics.mjs";
+import {
+  buildRefrigerantModel,
+  coolingDegreeDays,
+  energyFinding,
+  energyModel,
+  refrigerantFindings,
+  refrigerantSamples,
+} from "./refrigerant.mjs";
 
 /**
  * ctm365-hvac-health: runs hourly. For every HVAC unit of every customer with
@@ -105,11 +113,24 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
     const lastSeen = rows.length ? rows[rows.length - 1].ts : (baseline?.lastSeen ?? stored.find((i) => i.sk === "latest")?.lastSeen);
     const dayNow = key === todayKey ? now : to;
     const found = rows.length || key === todayKey ? findings({ today: day, recent, baseline: usable, lastSeen, now: dayNow }) : [];
+
+    // Refrigerant side (needs the strap-on line probes and outdoor air) and weather-adjusted energy.
+    const refSamples = refrigerantSamples(rows, day.cycles);
+    const cdd = coolingDegreeDays(rows.map((r) => r.outdoorF));
+    const recentIndex = days
+      .filter((d) => d.sk < `day#${key}` && Number.isFinite(d.refResiduals?.chargeIndex))
+      .slice(-13)
+      .map((d, i) => ({ x: i, y: d.refResiduals.chargeIndex }));
+    const ref = refrigerantFindings({ rows, cycles: day.cycles, samples: refSamples, model: usable?.refrigerant, recentIndex });
+    found.push(...ref.found);
+    const energy = energyFinding(usable?.energy, { kwh: day.metrics.kwh, cdd });
+    if (energy) found.push(energy);
     results[key] = { day, found, lastSeen };
 
     const item = {
       unit_id: unitId, sk: `day#${key}`, customer_id: customerId, day: key,
-      metrics: day.metrics, cycles: day.cycles.map(slimCycle), findings: found, computedAt: new Date(now).toISOString(),
+      metrics: { ...day.metrics, cdd }, cycles: day.cycles.map(slimCycle), findings: found,
+      refSamples, refResiduals: ref.residuals, computedAt: new Date(now).toISOString(),
     };
     if (rows.length) await db.send(new PutCommand({ TableName: env.analytics, Item: item }));
     const i = days.findIndex((d) => d.sk === item.sk);
@@ -119,7 +140,15 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
   // Keep learning until the baseline is frozen at its maximum number of days.
   if (!baseline || (baseline.days ?? 0) < RULES.baselineDaysMax) {
     const learnFrom = baseline?.resetAt ? days.filter((d) => d.day >= baseline.resetAt) : days;
-    baseline = { unit_id: unitId, sk: "baseline", customer_id: customerId, ...buildBaseline(learnFrom.map((d) => ({ day: d.day, metrics: d.metrics }))), resetAt: baseline?.resetAt, updatedAt: new Date(now).toISOString() };
+    const learned = buildBaseline(learnFrom.map((d) => ({ day: d.day, metrics: d.metrics })));
+    // The refrigerant and energy models learn from the same days as the rest of the baseline.
+    const baselineDays = learnFrom.filter((d) => (d.metrics.runtimeMin ?? 0) >= RULES.baselineMinRuntimeMin).slice(0, RULES.baselineDaysMax);
+    baseline = {
+      unit_id: unitId, sk: "baseline", customer_id: customerId, ...learned,
+      refrigerant: buildRefrigerantModel(baselineDays.flatMap((d) => d.refSamples ?? [])),
+      energy: energyModel(baselineDays.map((d) => ({ kwh: d.metrics.kwh, cdd: d.metrics.cdd }))),
+      resetAt: baseline?.resetAt, updatedAt: new Date(now).toISOString(),
+    };
     await db.send(new PutCommand({ TableName: env.analytics, Item: baseline }));
   }
 
@@ -131,7 +160,11 @@ export async function analyseUnit({ unitId, name, customerId }, now = Date.now()
       Item: {
         unit_id: unitId, sk: "latest", customer_id: customerId, name,
         ...h, findings: today.found, metrics: today.day.metrics, lastSeen: today.lastSeen,
-        baseline: { ready: baseline.ready, days: baseline.days, needed: RULES.baselineDaysNeeded, from: baseline.from, to: baseline.to, metrics: baseline.metrics },
+        baseline: {
+          ready: baseline.ready, days: baseline.days, needed: RULES.baselineDaysNeeded, from: baseline.from, to: baseline.to, metrics: baseline.metrics,
+          refrigerantModel: Boolean(baseline.refrigerant?.cooling || baseline.refrigerant?.heating), energyModel: Boolean(baseline.energy),
+        },
+        refResiduals: results[todayKey] && days.find((d) => d.sk === `day#${todayKey}`)?.refResiduals,
         computedAt: new Date(now).toISOString(),
       },
     }),

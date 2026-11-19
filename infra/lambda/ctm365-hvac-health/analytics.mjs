@@ -37,7 +37,7 @@ export const RULES = {
 
 const LEVELS = ["good", "watch", "elevated", "action"];
 export const LEVEL_WEIGHT = { good: 0, watch: 5, elevated: 15, action: 30 };
-export const CATEGORIES = ["cycling", "electrical", "airflow", "capacity", "data"];
+export const CATEGORIES = ["cycling", "electrical", "airflow", "capacity", "refrigerant", "data"];
 
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : undefined);
 
@@ -77,6 +77,11 @@ export function toRow(item) {
     returnF: num(item.air_return_temp_f),
     staticInwc: num(item.static_pressure_inwc),
     energyKwh: num(item.energy_kwh),
+    // Strap-on line probes and outdoor air (optional add-ons on spare ADAM channels).
+    sltF: num(item.suction_line_temp_f),
+    dltF: num(item.discharge_line_temp_f),
+    lltF: num(item.liquid_line_temp_f),
+    outdoorF: num(item.outdoor_air_temp_f),
     meter,
   };
 }

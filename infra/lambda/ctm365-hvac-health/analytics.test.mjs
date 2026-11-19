@@ -114,7 +114,7 @@ test("a problem seen on most of the last 7 days is raised one level", () => {
 });
 
 test("health score drops by finding level", () => {
-  assert.deepEqual(health([]), { status: "good", score: 100, categories: { cycling: "good", electrical: "good", airflow: "good", capacity: "good", data: "good" } });
+  assert.deepEqual(health([]), { status: "good", score: 100, categories: { cycling: "good", electrical: "good", airflow: "good", capacity: "good", refrigerant: "good", data: "good" } });
   const h = health([{ category: "airflow", level: "elevated" }, { category: "electrical", level: "watch" }]);
   assert.equal(h.score, 80);
   assert.equal(h.status, "elevated");

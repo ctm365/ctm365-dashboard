@@ -28,6 +28,12 @@ def convert(p):
     if has("ReturnAir") and p["ReturnAir"] > 0:
         out["air_return_temp_f"] = d(adam_f(p["ReturnAir"]), 2)
         out["air_return_raw"] = int(p["ReturnAir"])
+    # Strap-on refrigerant line probes and outdoor air, on spare ADAM-4015 channels
+    # (Pt1000, -40 to 160 C). Raw 0 is no response; 65535 is an open or unplugged probe.
+    for k, name in (("SuctionLine", "suction_line_temp_f"), ("DischargeLine", "discharge_line_temp_f"),
+                    ("LiquidLine", "liquid_line_temp_f"), ("OutdoorAir", "outdoor_air_temp_f")):
+        if has(k) and 0 < p[k] < 65535:
+            out[name] = d(adam_f(p[k]), 2)
     # Belimo 22ADP-554, imperial: raw / 1000 = in. w.c.
     if has("Static"):
         inwc = s16(p["Static"]) / 1000.0
