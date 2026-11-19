@@ -7,7 +7,14 @@
     {
       "dynamoDBv2": {
         "roleArn": "arn:aws:iam::593989447113:role/CTM365-IoT-DynamoDB-Role",
-        "putItem": { "tableName": "ctm365_telemetry" }
+        "putItem": {
+          "tableName": "ctm365_telemetry"
+        }
+      }
+    },
+    {
+      "lambda": {
+        "functionArn": "arn:aws:lambda:us-west-2:593989447113:function:ctm365-alerts"
       }
     }
   ]

@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadCustomerConfig",
+      "Effect": "Allow",
+      "Action": ["dynamodb:Scan", "dynamodb:GetItem"],
+      "Resource": "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_customer_config"
+    },
+    {
+      "Sid": "AlertState",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem"],
+      "Resource": "arn:aws:dynamodb:us-west-2:593989447113:table/ctm365_alert_state"
+    },
+    {
+      "Sid": "SendAlertEmail",
+      "Effect": "Allow",
+      "Action": "ses:SendEmail",
+      "Resource": "arn:aws:ses:us-west-2:593989447113:identity/*"
+    }
+  ]
+}
