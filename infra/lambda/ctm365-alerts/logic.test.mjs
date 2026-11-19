@@ -102,3 +102,13 @@ test("HTML email declares UTF-8 and writes the degree sign as an entity", () => 
   assert.match(email.html, /46\.8&#176;F/);
   assert.match(email.text, /46\.8°F/, "plain-text part keeps the real character");
 });
+
+test("email links to the dashboard and to the customer's settings", () => {
+  const email = buildEmail(
+    { customer, asset: customer.assets[0], sensor: customer.sensors[0], value: 26, ts: Date.UTC(2026, 10, 19), thresholds: customer.thresholds },
+    { dashboardUrl: "https://dashboard.ctm365.com", timeZone: "America/Los_Angeles" },
+  );
+  assert.match(email.html, /href="https:\/\/dashboard\.ctm365\.com\/electrical"[^>]*>Open the dashboard</);
+  assert.match(email.html, /href="https:\/\/dashboard\.ctm365\.com\/admin\/Acme%20Foods"/);
+  assert.match(email.text, /Open the dashboard: https:\/\/dashboard\.ctm365\.com\/electrical/);
+});
