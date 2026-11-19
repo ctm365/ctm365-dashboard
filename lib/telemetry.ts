@@ -43,6 +43,7 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
       electricalPowerMeterId: null,
       showVoltage: false,
       showCurrent: false,
+      hvacSampleData: false,
     };
   }
 
@@ -62,6 +63,7 @@ export async function getCustomerSite(customerId: string): Promise<SiteDef> {
     electricalPowerMeterId: config.electricalPowerMeterId,
     showVoltage: config.showVoltage,
     showCurrent: config.showCurrent,
+    hvacSampleData: config.hvacSampleData,
   };
 }
 

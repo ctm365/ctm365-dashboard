@@ -39,7 +39,7 @@ export default async function HvacPage() {
             Your site&apos;s HVAC units haven&apos;t been set up. Contact your CTM365 administrator.
           </EmptyState>
         ) : (
-          <HvacSection units={site.hvacUnits} />
+          <HvacSection units={site.hvacUnits} sample={site.hvacSampleData} />
         )}
       </main>
     </div>

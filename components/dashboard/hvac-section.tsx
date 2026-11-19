@@ -63,7 +63,7 @@ export function timeLabel(ts: number, withDate: boolean) {
     : { hour: "numeric", minute: "2-digit" });
 }
 
-export function HvacSection({ units }: { units: HvacUnitDef[] }) {
+export function HvacSection({ units, sample = false }: { units: HvacUnitDef[]; sample?: boolean }) {
   const [hours, setHours] = useState<number>(24);
   const [data, setData] = useState<HvacUnitData[] | null>(null);
   /** null while loading; units without results yet are simply missing. */
@@ -108,7 +108,9 @@ export function HvacSection({ units }: { units: HvacUnitDef[] }) {
           <h1 id="hvac-heading" className="font-display text-xl font-semibold text-ink">
             HVAC monitoring
           </h1>
-          <p className="text-sm text-muted">Updated every minute from the on-site gateway.</p>
+          <p className="text-sm text-muted">
+            {sample ? "Showing sample data for display. Live readings return when this is switched off." : "Updated every minute from the on-site gateway."}
+          </p>
         </div>
         <div role="group" aria-label="Time range" className="inline-flex rounded-md border border-line bg-surface p-0.5">
           {RANGES.map((r) => (
@@ -138,7 +140,7 @@ export function HvacSection({ units }: { units: HvacUnitDef[] }) {
         const unit = data?.find((u) => u.id === def.id);
         const unitHealth = health === null ? null : health.find((h) => h.unitId === def.id);
         return (
-          <HvacUnitCard key={def.id} name={def.name} readings={unit?.readings ?? null} hours={hours} now={now} health={unitHealth} />
+          <HvacUnitCard key={def.id} name={def.name} readings={unit?.readings ?? null} hours={hours} now={now} health={unitHealth} sample={sample} />
         );
       })}
     </section>
@@ -151,12 +153,14 @@ function HvacUnitCard({
   hours,
   now,
   health,
+  sample,
 }: {
   name: string;
   readings: HvacReading[] | null;
   hours: number;
   now: number;
   health: HvacHealth | undefined | null;
+  sample: boolean;
 }) {
   const rows = useMemo(() => readings ?? [], [readings]);
   const last = rows.at(-1);
@@ -219,9 +223,18 @@ function HvacUnitCard({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
         <h3 className="font-display text-lg font-semibold text-ink">{name}</h3>
         <div className="flex items-center gap-2 text-sm" aria-live="polite">
-          <span aria-hidden className={cn("size-2 rounded-full", fresh.dot)} />
-          <span className={cn("font-medium", fresh.text)}>{fresh.label}</span>
-          {last && <span className="tabular text-muted">· {timeLabel(last.ts, true)}</span>}
+          {sample ? (
+            <>
+              <span aria-hidden className="size-2 rounded-full bg-brand" />
+              <span className="font-medium text-brand">Sample data</span>
+            </>
+          ) : (
+            <>
+              <span aria-hidden className={cn("size-2 rounded-full", fresh.dot)} />
+              <span className={cn("font-medium", fresh.text)}>{fresh.label}</span>
+              {last && <span className="tabular text-muted">· {timeLabel(last.ts, true)}</span>}
+            </>
+          )}
         </div>
       </div>
 

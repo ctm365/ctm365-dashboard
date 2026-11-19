@@ -44,5 +44,7 @@ export interface CustomerConfig {
   /** Whether the Electrical page shows the panel's voltage / current. Off by default. */
   showVoltage: boolean;
   showCurrent: boolean;
+  /** HVAC page shows a sample heat pump instead of live readings. Off by default. */
+  hvacSampleData: boolean;
   updatedAt: string;
 }

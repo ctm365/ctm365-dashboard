@@ -47,6 +47,8 @@ export interface SiteDef {
   /** Show the panel's per-phase voltage / current on the Electrical page. */
   showVoltage: boolean;
   showCurrent: boolean;
+  /** HVAC page shows the sample heat pump instead of live readings (demos, or while equipment is offline). */
+  hvacSampleData: boolean;
 }
 
 /** One minute of electrical-panel power readings. Any field can be missing. */

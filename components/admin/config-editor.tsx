@@ -11,6 +11,7 @@ import {
   setSensorChannel,
   updateDatacardId,
   updateDisplaySettings,
+  updateHvacSampleData,
   updatePowerSettings,
   updateSampleData,
   updateServices,
@@ -264,7 +265,15 @@ export function ConfigEditor({ initialConfig, currentUserSub }: { initialConfig:
       {!config.services.hvac ? (
         <ServiceOffNote service="HVAC" kept={`Its ${plural(config.hvacUnits.length, "unit")} ${config.hvacUnits.length === 1 ? "is" : "are"} kept.`} />
       ) : (
-        <HvacUnitsEditor config={config} onSaved={setConfig} />
+        <>
+          <SampleDataSetting
+            id="hvac-sample-data"
+            on={config.hvacSampleData}
+            description="The HVAC page shows a sample Bard heat pump (all readings, refrigerant probes, health and runs) instead of live readings, labelled “Sample data”. For demos, or while the unit's equipment is offline. Live data, analytics and alerts carry on underneath."
+            onSave={(next) => save(() => updateHvacSampleData(customerId, next))}
+          />
+          <HvacUnitsEditor config={config} onSaved={setConfig} />
+        </>
       )}
 
       <h2 className="-mb-2 mt-2 font-display text-lg font-semibold text-ink">Users</h2>

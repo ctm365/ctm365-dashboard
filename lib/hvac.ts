@@ -2,6 +2,7 @@ import "server-only";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { HVAC_UNIT_ID_PATTERN } from "./config/validation";
+import { sampleHvacReadings } from "./sample-hvac";
 import { getCustomerSite } from "./telemetry";
 import type { HvacReading, HvacUnitData } from "./types";
 
@@ -85,6 +86,11 @@ async function queryUnit(unitId: string, sinceIso: string): Promise<HvacReading[
 export async function getHvacData(customerId: string, hours: number): Promise<HvacUnitData[] | null> {
   const site = await getCustomerSite(customerId);
   if (!site.services.hvac) return null;
+  if (site.hvacSampleData) {
+    const span = Math.min(Math.max(1, Math.round(hours)), HVAC_MAX_HOURS);
+    const readings = sampleHvacReadings(Date.now(), span);
+    return site.hvacUnits.map((u) => ({ id: u.id, name: u.name, readings }));
+  }
   const span = Math.min(Math.max(1, Math.round(hours)), HVAC_MAX_HOURS);
   const since = new Date(Date.now() - span * 3600_000).toISOString().slice(0, 17) + "00Z";
   const units = site.hvacUnits.filter((u) => HVAC_UNIT_ID_PATTERN.test(u.id));

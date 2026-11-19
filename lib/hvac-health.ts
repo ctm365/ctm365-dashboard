@@ -1,6 +1,7 @@
 import "server-only";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { BatchGetCommand, DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { sampleHvacHealth } from "./sample-hvac";
 import { getCustomerSite } from "./telemetry";
 import type { HvacCycle, HvacFinding, HvacHealth } from "./types";
 
@@ -62,6 +63,7 @@ export async function getHvacHealth(customerId: string): Promise<HvacHealth[] | 
   if (site.hvacUnits.length === 0) return [];
 
   const today = siteDayKey(Date.now());
+  if (site.hvacSampleData) return site.hvacUnits.map((u) => sampleHvacHealth(u.id, Date.now(), siteDayStart(today)));
   const items: Item[] = [];
   const batchGet = async (keys: Item[], projection?: string) => {
     // BatchGet takes up to 100 keys per call.

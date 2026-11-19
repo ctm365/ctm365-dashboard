@@ -172,6 +172,17 @@ export async function updateSampleData(customerId: string, on: boolean): Promise
   }
 }
 
+/** Shows the sample heat pump on this customer's HVAC page instead of live readings. */
+export async function updateHvacSampleData(customerId: string, on: boolean): Promise<ConfigResult> {
+  await requireAdminAction();
+  try {
+    if (typeof on !== "boolean") throw new ConfigInputError("Choose on or off.");
+    return applyChange("updateHvacSampleData", customerId, (c) => ({ ...c, hvacSampleData: on }));
+  } catch (err) {
+    return failure("updateHvacSampleData", err);
+  }
+}
+
 /** The electrical panel's power meter, and whether the Electrical page shows its voltage and current. */
 export async function updatePowerSettings(
   customerId: string,

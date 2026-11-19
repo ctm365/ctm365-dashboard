@@ -5,7 +5,17 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 
 /** Switches this customer's Electrical page to the fixed sample scenario, for demos. Saves when flipped. */
-export function SampleDataSetting({ on, onSave }: { on: boolean; onSave: (next: boolean) => Promise<void> }) {
+export function SampleDataSetting({
+  on,
+  onSave,
+  id = "sample-data",
+  description = "The Electrical page shows a fixed example (most sensors normal, one on watch, one critical) instead of live readings, labelled “Sample data”. Use it for prospects, never for a real customer.",
+}: {
+  on: boolean;
+  onSave: (next: boolean) => Promise<void>;
+  id?: string;
+  description?: string;
+}) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -26,19 +36,16 @@ export function SampleDataSetting({ on, onSave }: { on: boolean; onSave: (next: 
     <Card className="flex flex-col gap-2 px-5 py-4">
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
-          <label htmlFor="sample-data" className="text-sm font-medium text-ink">
+          <label htmlFor={id} className="text-sm font-medium text-ink">
             Show sample data (for demos)
           </label>
-          <p className="text-sm text-muted">
-            The Electrical page shows a fixed example (most sensors normal, one on watch, one critical) instead of
-            live readings, labelled &ldquo;Sample data&rdquo;. Use it for prospects, never for a real customer.
-          </p>
+          <p className="text-sm text-muted">{description}</p>
         </div>
         <span className="w-16 text-right text-xs text-muted" aria-hidden>
           {saving ? "Saving…" : on ? "On" : "Off"}
         </span>
         <button
-          id="sample-data"
+          id={id}
           type="button"
           role="switch"
           aria-checked={on}
